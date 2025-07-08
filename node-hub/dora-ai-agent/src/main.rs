@@ -1,0 +1,154 @@
+use dora_node_api::{
+    self,
+    arrow::array::{AsArray, StringArray},
+    dora_core::config::DataId,
+    merged::MergeExternalSend,
+    DoraNode, Event,
+};
+
+use eyre::{Context, ContextCompat};
+use futures::{
+    channel::oneshot::{self, Canceled},
+    TryStreamExt,
+};
+use hyper::{
+    body::{to_bytes, Body, HttpBody},
+    header,
+    server::conn::AddrStream,
+    service::{make_service_fn, service_fn},
+    Request, Response, Server, StatusCode,
+};
+use message::{
+    ChatCompletionObject, ChatCompletionObjectChoice, ChatCompletionObjectMessage,
+    ChatCompletionRequest, Usage,
+};
+use std::{
+    collections::VecDeque,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
+use tokio::{net::TcpListener, sync::mpsc};
+use tracing::{error, info};
+
+ mod models;
+ mod routing;
+ mod utils;
+ mod client;
+
+#[tokio::main]
+async fn main() -> eyre::Result<()> {
+    let (server_events_tx, server_events_rx) = mpsc::channel(3);
+    let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
+
+    let acceptor = TcpListener::new("0.0.0.0:8000").bind().await;
+    info!(target: "stdout", "Listening on {}", addr);
+    tokio::spawn(async move {
+        let result = Server::new(acceptor)
+            .serve(routing::root(server_events_tx.clone()))
+            .await
+            .context("server task failed");
+        if let Err(err) = server_events_tx.send(ServerEvent::Result(result)).await {
+            tracing::warn!("server result channel closed: {err}");
+        }
+    });
+
+    let (mut node, events) = DoraNode::init_from_env()?;
+
+    let merged = events.merge_external_send(server_events);
+    let events = futures::executor::block_on_stream(merged);
+
+    let output_id = DataId::from("text".to_owned());
+    let mut reply_channels = VecDeque::new();
+
+    for event in events {
+        match event {
+            dora_node_api::merged::MergedEvent::External(event) => match event {
+                ServerEvent::Result(server_result) => {
+                    server_result.context("server failed")?;
+                    break;
+                }
+                ServerEvent::ChatCompletionRequest { request, reply } => {
+                    let texts = request.to_texts();
+                    node.send_output(
+                        output_id.clone(),
+                        Default::default(),
+                        StringArray::from(texts),
+                    )
+                    .context("failed to send dora output")?;
+
+                    reply_channels.push_back((reply, 0 as u64, request.model));
+                }
+            },
+            dora_node_api::merged::MergedEvent::Dora(event) => match event {
+                Event::Input {
+                    id,
+                    data,
+                    metadata: _,
+                } => {
+                    match id.as_str() {
+                        "text" => {
+                            let (reply_channel, prompt_tokens, model) =
+                                reply_channels.pop_front().context("no reply channel")?;
+                            let data = data.as_string::<i32>();
+                            let string = data.iter().fold("".to_string(), |mut acc, s| {
+                                if let Some(s) = s {
+                                    acc.push_str("\n");
+                                    acc.push_str(s);
+                                }
+                                acc
+                            });
+
+                            let data = ChatCompletionObject {
+                                id: format!("completion-{}", uuid::Uuid::new_v4()),
+                                object: "chat.completion".to_string(),
+                                created: chrono::Utc::now().timestamp() as u64,
+                                model: model.unwrap_or_default(),
+                                choices: vec![ChatCompletionObjectChoice {
+                                    index: 0,
+                                    message: ChatCompletionObjectMessage {
+                                        role: message::ChatCompletionRole::Assistant,
+                                        content: Some(string.to_string()),
+                                        tool_calls: Vec::new(),
+                                        function_call: None,
+                                    },
+                                    finish_reason: message::FinishReason::stop,
+                                    logprobs: None,
+                                }],
+                                usage: Usage {
+                                    prompt_tokens,
+                                    completion_tokens: string.len() as u64,
+                                    total_tokens: prompt_tokens + string.len() as u64,
+                                },
+                            };
+
+                            if reply_channel.send(Ok(data)).is_err() {
+                                tracing::warn!("failed to send chat completion reply because channel closed early");
+                            }
+                        }
+                        _ => eyre::bail!("unexpected input id: {}", id),
+                    };
+                }
+                Event::Stop(_) => {
+                    break;
+                }
+                Event::InputClosed { id, .. } => {
+                    info!("Input channel closed for id: {}", id);
+                }
+                event => {
+                    eyre::bail!("unexpected event: {:#?}", event)
+                }
+            },
+        }
+    }
+
+    Ok(())
+}
+
+enum ServerEvent {
+    Result(eyre::Result<()>),
+    ChatCompletionRequest {
+        request: ChatCompletionRequest,
+        reply: oneshot::Sender<eyre::Result<ChatCompletionObject>>,
+    },
+}
+

@@ -34,6 +34,8 @@ members = [
     "node-hub/dora-rerun",
     "node-hub/terminal-print",
     "node-hub/openai-proxy-server",
+    "node-hub/dora-ai-agent",
+    "node-hub/dora-mcp-server",
     "node-hub/dora-kit-car",
     "node-hub/dora-object-to-pose",
     "node-hub/dora-mistral-rs",

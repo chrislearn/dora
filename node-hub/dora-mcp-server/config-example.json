@@ -1,0 +1,12 @@
+
+{
+    "port": 123,
+    "tools": [
+        {
+            "name": "dora-mcp-server",
+            "input": "abc",
+            "output": "output123",
+            "type": "nodejs"
+        }
+    ],
+}
