@@ -1,25 +1,17 @@
-use std::{
-    collections::VecDeque,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
+use std::collections::VecDeque;
 
 use dora_node_api::{
     self,
     arrow::array::{AsArray, StringArray},
     dora_core::config::DataId,
-    merged::MergeExternalSend,
+    merged::{MergeExternalSend, MergedEvent},
     DoraNode, Event,
 };
 
 use eyre::{Context, ContextCompat};
-use futures::{
-    channel::oneshot::{self, Canceled},
-    TryStreamExt,
-};
+use futures::channel::oneshot;
 use salvo::prelude::*;
 use tokio::sync::mpsc;
-use tracing::{error, info};
 
 mod client;
 mod models;
@@ -56,7 +48,7 @@ async fn main() -> eyre::Result<()> {
 
     for event in events {
         match event {
-            dora_node_api::merged::MergedEvent::External(event) => match event {
+            MergedEvent::External(event) => match event {
                 ServerEvent::Result(server_result) => {
                     server_result.context("server failed")?;
                     break;
@@ -73,7 +65,7 @@ async fn main() -> eyre::Result<()> {
                     reply_channels.push_back((reply, 0 as u64, request.model));
                 }
             },
-            dora_node_api::merged::MergedEvent::Dora(event) => match event {
+            MergedEvent::Dora(event) => match event {
                 Event::Input {
                     id,
                     data,
@@ -86,7 +78,7 @@ async fn main() -> eyre::Result<()> {
                             let data = data.as_string::<i32>();
                             let string = data.iter().fold("".to_string(), |mut acc, s| {
                                 if let Some(s) = s {
-                                    acc.push_str("\n");
+                                    acc.push('\n');
                                     acc.push_str(s);
                                 }
                                 acc
@@ -115,7 +107,7 @@ async fn main() -> eyre::Result<()> {
                                 },
                             };
 
-                            if reply_channel.send(Ok(data)).is_err() {
+                            if reply_channel.send(data).is_err() {
                                 tracing::warn!("failed to send chat completion reply because channel closed early");
                             }
                         }
@@ -126,7 +118,7 @@ async fn main() -> eyre::Result<()> {
                     break;
                 }
                 Event::InputClosed { id, .. } => {
-                    info!("Input channel closed for id: {}", id);
+                    tracing::info!("Input channel closed for id: {}", id);
                 }
                 event => {
                     eyre::bail!("unexpected event: {:#?}", event)
@@ -142,6 +134,6 @@ enum ServerEvent {
     Result(eyre::Result<()>),
     ChatCompletionRequest {
         request: ChatCompletionRequest,
-        reply: oneshot::Sender<eyre::Result<ChatCompletionObject>>,
+        reply: oneshot::Sender<ChatCompletionObject>,
     },
 }

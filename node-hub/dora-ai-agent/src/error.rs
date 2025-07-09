@@ -1,10 +1,5 @@
-use std::borrow::Cow;
-use std::io;
-use std::string::FromUtf8Error;
-
 use salvo::async_trait;
 use salvo::http::{StatusCode, StatusError};
-use salvo::oapi::{self, EndpointOutRegister, ToSchema};
 use salvo::prelude::{Depot, Request, Response, Writer};
 use thiserror::Error;
 
@@ -46,20 +41,18 @@ impl AppError {
 
 #[async_trait]
 impl Writer for AppError {
-    async fn write(mut self, req: &mut Request, depot: &mut Depot, res: &mut Response) {
+    async fn write(mut self, _req: &mut Request, _depot: &mut Depot, res: &mut Response) {
         let code = match &self {
             AppError::StatusError(e) => e.code,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         res.status_code(code);
         let data = match self {
-            AppError::Salvo(e) => {
+            AppError::Salvo(_e) => {
                 StatusError::internal_server_error().brief("Unknown error happened in salvo.")
             }
             AppError::Public(msg) => StatusError::internal_server_error().brief(msg),
-            AppError::Internal(msg) => {
-                    StatusError::internal_server_error()
-            }
+            AppError::Internal(_msg) => StatusError::internal_server_error(),
             AppError::StatusError(e) => e,
             _ => StatusError::internal_server_error().brief("Unknown error happened."),
         };
