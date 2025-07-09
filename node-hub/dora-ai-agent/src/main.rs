@@ -1,3 +1,9 @@
+use std::{
+    collections::VecDeque,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
+
 use dora_node_api::{
     self,
     arrow::array::{AsArray, StringArray},
@@ -11,29 +17,19 @@ use futures::{
     channel::oneshot::{self, Canceled},
     TryStreamExt,
 };
-use hyper::{
-    body::{to_bytes, Body, HttpBody},
-    header,
-    server::conn::AddrStream,
-    service::{make_service_fn, service_fn},
-    Request, Response, Server, StatusCode,
-};
-use message::{
-    ChatCompletionObject, ChatCompletionObjectChoice, ChatCompletionObjectMessage,
-    ChatCompletionRequest, Usage,
-};
-use std::{
-    collections::VecDeque,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
-use tokio::{net::TcpListener, sync::mpsc};
+use salvo::prelude::*;
+use tokio::sync::mpsc;
 use tracing::{error, info};
 
- mod models;
- mod routing;
- mod utils;
- mod client;
+mod client;
+mod models;
+mod routing;
+mod utils;
+use models::*;
+mod error;
+use error::AppError;
+
+pub type AppResult<T> = Result<T, crate::AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -41,13 +37,11 @@ async fn main() -> eyre::Result<()> {
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
     let acceptor = TcpListener::new("0.0.0.0:8000").bind().await;
-    info!(target: "stdout", "Listening on {}", addr);
     tokio::spawn(async move {
-        let result = Server::new(acceptor)
+        Server::new(acceptor)
             .serve(routing::root(server_events_tx.clone()))
-            .await
-            .context("server task failed");
-        if let Err(err) = server_events_tx.send(ServerEvent::Result(result)).await {
+            .await;
+        if let Err(err) = server_events_tx.send(ServerEvent::Result(Ok(()))).await {
             tracing::warn!("server result channel closed: {err}");
         }
     });
@@ -106,12 +100,12 @@ async fn main() -> eyre::Result<()> {
                                 choices: vec![ChatCompletionObjectChoice {
                                     index: 0,
                                     message: ChatCompletionObjectMessage {
-                                        role: message::ChatCompletionRole::Assistant,
+                                        role: ChatCompletionRole::Assistant,
                                         content: Some(string.to_string()),
                                         tool_calls: Vec::new(),
                                         function_call: None,
                                     },
-                                    finish_reason: message::FinishReason::stop,
+                                    finish_reason: FinishReason::stop,
                                     logprobs: None,
                                 }],
                                 usage: Usage {
@@ -151,4 +145,3 @@ enum ServerEvent {
         reply: oneshot::Sender<eyre::Result<ChatCompletionObject>>,
     },
 }
-
