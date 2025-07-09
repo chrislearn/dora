@@ -28,7 +28,7 @@ async fn main() -> eyre::Result<()> {
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
-    let acceptor = TcpListener::new("0.0.0.0:8000").bind().await;
+    let acceptor = TcpListener::new("0.0.0.0:8080").bind().await;
     tokio::spawn(async move {
         Server::new(acceptor)
             .serve(routing::root(server_events_tx.clone()))
