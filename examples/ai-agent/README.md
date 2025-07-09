@@ -13,6 +13,6 @@ dora build dataflow.yml --uv
 dora run dataflow.yml --uv
 
 # In a separate terminal
-python openai_api_client.py
+uv run openai_api_client.py
 dora stop
 ```

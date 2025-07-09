@@ -11,6 +11,7 @@ use dora_node_api::{
 use eyre::{Context, ContextCompat};
 use futures::channel::oneshot;
 use salvo::prelude::*;
+use salvo::cors::*;
 use tokio::sync::mpsc;
 
 mod client;
@@ -30,9 +31,14 @@ async fn main() -> eyre::Result<()> {
 
     let acceptor = TcpListener::new("0.0.0.0:8080").bind().await;
     tokio::spawn(async move {
-        Server::new(acceptor)
-            .serve(routing::root(server_events_tx.clone()))
-            .await;
+        let service = Service::new(routing::root(server_events_tx.clone())).hoop(
+            Cors::new()
+                .allow_origin(AllowOrigin::any())
+                .allow_methods(AllowMethods::any())
+                .allow_headers(AllowHeaders::any())
+                .into_handler(),
+        );
+        Server::new(acceptor).serve(service).await;
         if let Err(err) = server_events_tx.send(ServerEvent::Result(Ok(()))).await {
             tracing::warn!("server result channel closed: {err}");
         }

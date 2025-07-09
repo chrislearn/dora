@@ -2,7 +2,6 @@ use eyre::Context;
 use futures::channel::oneshot;
 use futures::TryStreamExt;
 use rust_embed::RustEmbed;
-use salvo::cors::*;
 use salvo::prelude::*;
 use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
@@ -16,16 +15,9 @@ struct Assets;
 
 pub fn root(server_events_tx: mpsc::Sender<ServerEvent>) -> Router {
     Router::with_hoop(affix_state::inject(server_events_tx))
-        .hoop(
-            Cors::new()
-                .allow_origin(AllowOrigin::any())
-                .allow_methods(AllowMethods::any())
-                .allow_headers(AllowHeaders::any())
-                .into_handler(),
-        )
         .push(
             Router::with_path("v1")
-                .push(Router::with_path("chat/completions").get(chat_completions))
+                .push(Router::with_path("chat/completions").post(chat_completions))
                 .push(Router::with_path("models").get(todo))
                 .push(Router::with_path("embeddings").get(todo))
                 .push(Router::with_path("files").get(todo))
