@@ -1,4 +1,12 @@
 nodes:
+  - id: dora-ai-agent
+    build: cargo build -p dora-ai-agent --release
+    path: ../../target/release/dora-ai-agent
+    outputs:
+      - text
+    inputs:
+      text: dora-echo/echo
+
   - id: dora-echo
     build: pip install -e ../../node-hub/dora-echo
     path: dora-echo
@@ -6,58 +14,3 @@ nodes:
       echo: dora-ai-agent/text
     outputs:
       - echo
-
-  - id: dora-ai-agent
-    build: cargo build -p dora-ai-agent --release
-    path: ../../target/release/dora-ai-agent
-    inputs:
-      model: dora-qwen2.5-vl/text
-      echo: dora-echo/echo
-      mcp1-result1: dora-mcp-server1/mcp1-out
-    outputs:
-      - text
-      - mcp1
-      - model
-    env:
-      MCP_SERVERS: "dora-mcp-server1.json"
-
-  - id: dora-mcp-server1
-    build: cargo build -p dora-mcp-server --release
-    path: ../../target/release/dora-mcp-server
-    inputs:
-      mcp1: dora-ai-agent/mcp1
-      mcp1-r: dora-do-somthing1/text
-      mcp1-r2: dora-do-somthing2/text
-    outputs:
-      - mcp1-out
-      - mcp1-call
-      - mcp1-call2
-    env:
-      MCP_SERVER_PORT: 5005
-      MCP_SCHEMA: "schema.json"
-
-
-  - id: dora-do-somthing1
-    build: cargo build -p dora-mcp-server --release
-    path: ../../target/release/dora-mcp-server
-    inputs:
-      mcp1: dora-mcp-server1/mcp1-call
-    outputs:
-      - text
-
-
-  - id: dora-do-somthing2
-    build: cargo build -p dora-mcp-server --release
-    path: ../../target/release/dora-mcp-server
-    inputs:
-      mcp1: dora-mcp-server1/mcp1-call2
-    outputs:
-      - text
-
-  - id: dora-qwen2.5-vl
-    build: pip install -e ../../node-hub/dora-qwen2-5-vl
-    path: dora-qwen2-5-vl
-    inputs:
-      text: dora-ai-agent/model
-    outputs:
-      - text
