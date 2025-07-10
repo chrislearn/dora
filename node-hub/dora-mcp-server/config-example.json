@@ -1,6 +1,5 @@
 
 {
-    "port": 123,
     "tools": [
         {
             "name": "dora-mcp-server",
