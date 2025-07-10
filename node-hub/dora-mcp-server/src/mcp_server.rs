@@ -23,7 +23,7 @@ impl McpServer {
 
     pub fn handle_ping(&self) {}
     pub fn handle_tools_list(&self) {}
-    pub fn handle_tool_call(&self, params: JsonObject) {}
+    pub fn handle_tools_call(&self, params: JsonObject) {}
 
     pub fn handle_request(&self, request: Request) {
         let Request {
@@ -34,7 +34,7 @@ impl McpServer {
         match method.as_str() {
             "ping" => self.handle_ping(),
             "tools/list" => self.handle_tools_list(),
-            "tools/call" => self.handle_tool_call(params),
+            "tools/call" => self.handle_tools_call(params),
             method => {
                 tracing::error!("unexpected method: {:#?}", method)
             }

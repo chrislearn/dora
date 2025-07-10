@@ -21,11 +21,14 @@ mod utils;
 use models::*;
 mod error;
 use error::AppError;
+mod config;
 
 pub type AppResult<T> = Result<T, crate::AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
+    config::init();
+    
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
