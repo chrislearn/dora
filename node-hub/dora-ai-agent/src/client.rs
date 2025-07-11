@@ -1,8 +1,8 @@
-
-use eyre::{Result, Report};
-use salvo::async_trait;
-use reqwest::Client as HttpClient;use eyre::eyre;
 use crate::models::{CompletionRequest, CompletionResponse};
+use eyre::eyre;
+use eyre::Result;
+use reqwest::Client as HttpClient;
+use salvo::async_trait;
 
 use crate::DataId;
 

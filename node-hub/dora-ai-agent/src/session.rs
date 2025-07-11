@@ -3,12 +3,12 @@ use std::{
     sync::Arc,
 };
 
-use eyre::{Result, Report};
+use eyre::{Report, Result};
 use serde_json;
 
 use crate::client::ChatClient;
 use crate::{
-    models::{CompletionRequest, ChatCompletionMessage, ToolFunction},
+    models::{ChatCompletionMessage, CompletionRequest, ToolFunction},
     tool::{Tool as ToolTrait, ToolSet},
 };
 
@@ -83,8 +83,9 @@ impl ChatSession {
                 match tool.call(args).await {
                     Ok(result) => {
                         if result.is_error.is_some_and(|b| b) {
-                            self.messages
-                                .push(ChatCompletionMessage::user("tool call failed, mcp call error"));
+                            self.messages.push(ChatCompletionMessage::user(
+                                "tool call failed, mcp call error",
+                            ));
                         } else {
                             result.content.iter().for_each(|content| {
                                 if let Some(content_text) = content.as_text() {
@@ -105,8 +106,10 @@ impl ChatSession {
                     }
                     Err(e) => {
                         println!("tool call failed: {}", e);
-                        self.messages
-                            .push(ChatCompletionMessage::user(format!("tool call failed: {}", e)));
+                        self.messages.push(ChatCompletionMessage::user(format!(
+                            "tool call failed: {}",
+                            e
+                        )));
                     }
                 }
             } else {

@@ -222,11 +222,7 @@ impl<'de> Deserialize<'de> for CompletionRequest {
             "tools",
             "tool_choice",
         ];
-        deserializer.deserialize_struct(
-            "CompletionRequest",
-            FIELDS,
-            CompletionRequestVisitor,
-        )
+        deserializer.deserialize_struct("CompletionRequest", FIELDS, CompletionRequestVisitor)
     }
 }
 
@@ -915,7 +911,6 @@ impl Content {
     }
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompletionResponse {
     pub id: String,
@@ -924,7 +919,6 @@ pub struct CompletionResponse {
     pub model: String,
     pub choices: Vec<Choice>,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatCompletionMessage {
@@ -958,7 +952,6 @@ impl ChatCompletionMessage {
             tool_calls: None,
         }
     }
-
 
     /// The contents of the message.
     pub fn to_texts(&self) -> Vec<String> {

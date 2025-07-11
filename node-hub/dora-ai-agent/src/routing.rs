@@ -1,14 +1,13 @@
-
+use eyre::{Context, ContextCompat};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
 use rust_embed::RustEmbed;
 use salvo::prelude::*;
 use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
- use eyre::{Context, ContextCompat};
 
 use crate::models::*;
-use crate::{AppResult, AppError, ServerEvent};
+use crate::{AppError, AppResult, ServerEvent};
 
 #[derive(RustEmbed)]
 #[folder = "static"]

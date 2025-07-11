@@ -1,17 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
-use eyre::{Result, Report};
-use salvo::async_trait;
+use eyre::{Report, Result};
 use rmcp::{
-    Error as McpError,
     model::{CallToolRequestParam, CallToolResult, Tool as McpTool},
     service::ServerSink,
+    Error as McpError,
 };
+use salvo::async_trait;
 use serde_json::Value;
 
-use crate::{
-    models::{Content, ToolResult},
-};
+use crate::models::{Content, ToolResult};
 
 #[async_trait]
 pub trait Tool: Send + Sync {
