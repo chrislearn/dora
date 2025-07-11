@@ -1,13 +1,14 @@
-use eyre::Context;
+
 use futures::channel::oneshot;
 use futures::TryStreamExt;
 use rust_embed::RustEmbed;
 use salvo::prelude::*;
 use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
+ use eyre::{Context, ContextCompat};
 
 use crate::models::*;
-use crate::{AppResult, ServerEvent};
+use crate::{AppResult, AppError, ServerEvent};
 
 #[derive(RustEmbed)]
 #[folder = "static"]
@@ -46,7 +47,7 @@ async fn chat_completions(
 
     tracing::info!(target: "stdout", "Prepare the chat completion request.");
 
-    let mut chat_request = req.parse_json::<ChatCompletionRequest>().await?;
+    let mut chat_request = req.parse_json::<CompletionRequest>().await?;
 
     // check if the user id is provided
     if chat_request.user.is_none() {
@@ -60,7 +61,7 @@ async fn chat_completions(
 
     let (tx, rx) = oneshot::channel();
     request_tx
-        .send(ServerEvent::ChatCompletionRequest {
+        .send(ServerEvent::CompletionRequest {
             request: chat_request,
             reply: tx,
         })
@@ -69,9 +70,9 @@ async fn chat_completions(
     if let Some(true) = stream {
         let result = async {
             let chat_completion_object = rx.await?;
-            serde_json::to_string(&chat_completion_object).context("failed to serialize response")
+            Ok::<_, AppError>(serde_json::to_string(&chat_completion_object)?)
         };
-        let stream = futures::stream::once(result).map_err(|e| e.to_string());
+        let stream = futures::stream::once(result);
 
         let _ = res.add_header("Content-Type", "text/event-stream", true);
         let _ = res.add_header("Cache-Control", "no-cache", true);

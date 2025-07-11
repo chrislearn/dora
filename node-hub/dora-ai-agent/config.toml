@@ -1,0 +1,7 @@
+
+[mcp]
+[[mcp.server]]
+name = "MCP server name"
+protocol = "stdio"
+command = "MCP server path"
+args = [" "]

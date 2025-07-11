@@ -11,7 +11,7 @@ use serde_json::Value;
 // Forked from https://github.com/LlamaEdge/LlamaEdge/blob/6bfe9c12c85bf390c47d6065686caeca700feffa/crates/endpoints/src/chat.rs#L304
 /// Represents a chat completion request.
 #[derive(Debug, Serialize, Default)]
-pub struct ChatCompletionRequest {
+pub struct CompletionRequest {
     /// The model to use for generating completions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
@@ -72,7 +72,7 @@ pub struct ChatCompletionRequest {
     //* OpenAI specific parameters
     /// **Deprecated since 0.10.0.** Use `tools` instead.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub functions: Option<Vec<ChatCompletionRequestFunction>>,
+    pub functions: Option<Vec<CompletionRequestFunction>>,
     /// **Deprecated since 0.10.0.** Use `tool_choice` instead.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_call: Option<String>,
@@ -84,26 +84,26 @@ pub struct ChatCompletionRequest {
     ///
     /// Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Tool>>,
+    pub tools: Option<Vec<ToolInfo>>,
     /// Controls which (if any) function is called by the model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<ToolChoice>,
 }
-impl<'de> Deserialize<'de> for ChatCompletionRequest {
+impl<'de> Deserialize<'de> for CompletionRequest {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct ChatCompletionRequestVisitor;
+        struct CompletionRequestVisitor;
 
-        impl<'de> Visitor<'de> for ChatCompletionRequestVisitor {
-            type Value = ChatCompletionRequest;
+        impl<'de> Visitor<'de> for CompletionRequestVisitor {
+            type Value = CompletionRequest;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct ChatCompletionRequest")
+                formatter.write_str("struct CompletionRequest")
             }
 
-            fn visit_map<V>(self, mut map: V) -> Result<ChatCompletionRequest, V::Error>
+            fn visit_map<V>(self, mut map: V) -> Result<CompletionRequest, V::Error>
             where
                 V: MapAccess<'de>,
             {
@@ -178,8 +178,8 @@ impl<'de> Deserialize<'de> for ChatCompletionRequest {
                     stream = Some(false);
                 }
 
-                // Construct ChatCompletionRequest with all fields
-                Ok(ChatCompletionRequest {
+                // Construct CompletionRequest with all fields
+                Ok(CompletionRequest {
                     model,
                     messages,
                     temperature,
@@ -223,14 +223,14 @@ impl<'de> Deserialize<'de> for ChatCompletionRequest {
             "tool_choice",
         ];
         deserializer.deserialize_struct(
-            "ChatCompletionRequest",
+            "CompletionRequest",
             FIELDS,
-            ChatCompletionRequestVisitor,
+            CompletionRequestVisitor,
         )
     }
 }
 
-impl ChatCompletionRequest {
+impl CompletionRequest {
     pub fn to_texts(&self) -> Vec<String> {
         self.messages
             .iter()
@@ -239,105 +239,9 @@ impl ChatCompletionRequest {
     }
 }
 
-/// Message for comprising the conversation.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(tag = "role", rename_all = "lowercase")]
-pub enum ChatCompletionMessage {
-    System(ChatCompletionSystemMessage),
-    User(ChatCompletionUserMessage),
-    Assistant(ChatCompletionAssistantMessage),
-    Tool(ChatCompletionToolMessage),
-}
-impl ChatCompletionMessage {
-    /// Creates a new system message.
-    ///
-    /// # Arguments
-    ///
-    /// * `content` - The contents of the system message.
-    ///
-    /// * `name` - An optional name for the participant. Provides the model information to differentiate between participants of the same role.
-    pub fn new_system_message(content: impl Into<String>, name: Option<String>) -> Self {
-        ChatCompletionMessage::System(ChatCompletionSystemMessage::new(content, name))
-    }
-
-    /// Creates a new user message.
-    ///
-    /// # Arguments
-    ///
-    /// * `content` - The contents of the user message.
-    ///
-    /// * `name` - An optional name for the participant. Provides the model information to differentiate between participants of the same role.
-    pub fn new_user_message(
-        content: ChatCompletionUserMessageContent,
-        name: Option<String>,
-    ) -> Self {
-        ChatCompletionMessage::User(ChatCompletionUserMessage::new(content, name))
-    }
-
-    /// Creates a new assistant message.
-    ///
-    /// # Arguments
-    ///
-    /// * `content` - The contents of the assistant message. Required unless `tool_calls` is specified.
-    ///
-    /// * `name` - An optional name for the participant. Provides the model information to differentiate between participants of the same role.
-    ///
-    /// * `tool_calls` - The tool calls generated by the model.
-    pub fn new_assistant_message(
-        content: Option<String>,
-        name: Option<String>,
-        tool_calls: Option<Vec<ToolCall>>,
-    ) -> Self {
-        ChatCompletionMessage::Assistant(ChatCompletionAssistantMessage::new(
-            content, name, tool_calls,
-        ))
-    }
-
-    /// Creates a new tool message.
-    pub fn new_tool_message(content: impl Into<String>, tool_call_id: Option<String>) -> Self {
-        ChatCompletionMessage::Tool(ChatCompletionToolMessage::new(content, tool_call_id))
-    }
-
-    /// The role of the messages author.
-    pub fn role(&self) -> ChatCompletionRole {
-        match self {
-            ChatCompletionMessage::System(_) => ChatCompletionRole::System,
-            ChatCompletionMessage::User(_) => ChatCompletionRole::User,
-            ChatCompletionMessage::Assistant(_) => ChatCompletionRole::Assistant,
-            ChatCompletionMessage::Tool(_) => ChatCompletionRole::Tool,
-        }
-    }
-
-    /// The name of the participant. Provides the model information to differentiate between participants of the same role.
-    pub fn name(&self) -> Option<&String> {
-        match self {
-            ChatCompletionMessage::System(message) => message.name(),
-            ChatCompletionMessage::User(message) => message.name(),
-            ChatCompletionMessage::Assistant(message) => message.name(),
-            ChatCompletionMessage::Tool(_) => None,
-        }
-    }
-
-    /// The contents of the message.
-    pub fn to_texts(&self) -> Vec<String> {
-        match self {
-            ChatCompletionMessage::System(message) => {
-                vec![String::from("<|system|>\n") + &message.content]
-            }
-            ChatCompletionMessage::User(message) => message.content.to_texts(),
-            ChatCompletionMessage::Assistant(message) => {
-                vec![String::from("<|assistant|>\n") + &message.content.clone().unwrap_or_default()]
-            }
-            ChatCompletionMessage::Tool(message) => {
-                vec![String::from("<|tool|>\n") + &message.content.clone()]
-            }
-        }
-    }
-}
-
 /// Sampling methods used for chat completion requests.
 #[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
-pub enum ChatCompletionRequestSampling {
+pub enum CompletionRequestSampling {
     /// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
     Temperature(f64),
     /// An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered.
@@ -369,11 +273,11 @@ impl std::fmt::Display for ChatCompletionRole {
 
 /// **Deprecated since 0.10.0.** Use [Tool] instead.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ChatCompletionRequestFunction {
+pub struct CompletionRequestFunction {
     name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
-    parameters: ChatCompletionRequestFunctionParameters,
+    parameters: CompletionRequestFunctionParameters,
 }
 
 /// The parameters the functions accepts, described as a JSON Schema object.
@@ -383,7 +287,7 @@ pub struct ChatCompletionRequestFunction {
 /// To describe a function that accepts no parameters, provide the value
 /// `{"type": "object", "properties": {}}`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ChatCompletionRequestFunctionParameters {
+pub struct CompletionRequestFunctionParameters {
     #[serde(rename = "type")]
     pub schema_type: JSONSchemaType,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -570,6 +474,13 @@ pub struct ChatMessageFunctionCall {
     pub arguments: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToolInfo {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
 /// Represents a tool call generated by the model.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ToolCall {
@@ -579,7 +490,12 @@ pub struct ToolCall {
     #[serde(rename = "type")]
     pub ty: String,
     /// The function that the model called.
-    pub function: Function,
+    pub function: ToolFunction,
+}
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ToolFunction {
+    pub name: String,
+    pub arguments: String,
 }
 
 /// Log probability information for the choice.
@@ -949,18 +865,18 @@ pub struct Tool {
     pub function: ToolFunction,
 }
 
-/// Function the model may generate JSON inputs for.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ToolFunction {
-    /// The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
-    pub name: String,
-    /// A description of what the function does, used by the model to choose when and how to call the function.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    // The parameters the functions accepts, described as a JSON Schema object.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parameters: Option<ToolFunctionParameters>,
-}
+// /// Function the model may generate JSON inputs for.
+// #[derive(Debug, Clone, Deserialize, Serialize)]
+// pub struct ToolFunction {
+//     /// The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64.
+//     pub name: String,
+//     /// A description of what the function does, used by the model to choose when and how to call the function.
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     pub description: Option<String>,
+//     // The parameters the functions accepts, described as a JSON Schema object.
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     pub parameters: Option<ToolFunctionParameters>,
+// }
 
 /// The parameters the functions accepts, described as a JSON Schema object.
 ///
@@ -976,4 +892,95 @@ pub struct ToolFunctionParameters {
     pub properties: Option<IndexMap<String, Box<JSONSchemaDefine>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ToolResult {
+    pub success: bool,
+    pub contents: Vec<Content>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Content {
+    pub content_type: String,
+    pub body: String,
+}
+
+impl Content {
+    pub fn text(content: impl ToString) -> Self {
+        Self {
+            content_type: "text/plain".to_string(),
+            body: content.to_string(),
+        }
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CompletionResponse {
+    pub id: String,
+    pub object: String,
+    pub created: u64,
+    pub model: String,
+    pub choices: Vec<Choice>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChatCompletionMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl ChatCompletionMessage {
+    pub fn system(content: impl ToString) -> Self {
+        Self {
+            role: "system".to_string(),
+            content: content.to_string(),
+            tool_calls: None,
+        }
+    }
+
+    pub fn user(content: impl ToString) -> Self {
+        Self {
+            role: "user".to_string(),
+            content: content.to_string(),
+            tool_calls: None,
+        }
+    }
+
+    pub fn assistant(content: impl ToString) -> Self {
+        Self {
+            role: "assistant".to_string(),
+            content: content.to_string(),
+            tool_calls: None,
+        }
+    }
+
+
+    /// The contents of the message.
+    pub fn to_texts(&self) -> Vec<String> {
+        match &*self.role {
+            "system" => {
+                vec![String::from("<|system|>\n") + &self.content]
+            }
+            "user" => vec![String::from("<|user|>\n") + &self.content.clone()],
+            "assistant" => {
+                vec![String::from("<|assistant|>\n") + &self.content.clone()]
+            }
+            "tool" => {
+                vec![String::from("<|tool|>\n") + &self.content.clone()]
+            }
+            _ => vec![String::from("<|unknown|>\n") + &self.content.clone()],
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Choice {
+    pub index: u32,
+    pub message: ChatCompletionMessage,
+    pub finish_reason: String,
 }

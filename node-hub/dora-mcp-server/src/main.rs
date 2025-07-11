@@ -50,7 +50,7 @@ async fn main() -> eyre::Result<()> {
                         server.handle_request(request);
                     }
                     _ => {
-                        node.send_output(DataId::from("response".to_owned()), Default::default(), data.0)
+                        node.send_output(DataId::from("response".to_owned()), metadata, data.0)
                             .context("failed to send dora output")?;
                     }
                 };

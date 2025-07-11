@@ -1,17 +1,16 @@
 use std::collections::VecDeque;
 
 use dora_node_api::{
-    self,
     arrow::array::{AsArray, StringArray},
     dora_core::config::DataId,
     merged::{MergeExternalSend, MergedEvent},
     DoraNode, Event,
 };
-
 use eyre::{Context, ContextCompat};
+
 use futures::channel::oneshot;
-use salvo::prelude::*;
 use salvo::cors::*;
+use salvo::prelude::*;
 use tokio::sync::mpsc;
 
 mod client;
@@ -22,13 +21,17 @@ use models::*;
 mod error;
 use error::AppError;
 mod config;
+mod session;
+use session::ChatSession;
+mod tool;
+use tool::{get_mcp_tools, Tool, ToolSet};
 
 pub type AppResult<T> = Result<T, crate::AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     config::init();
-    
+
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
@@ -47,6 +50,25 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
+    let mut tool_set = ToolSet::default();
+
+    let config = config::get();
+    // load MCP
+    if config.mcp.is_some() {
+        let mcp_clients = config.create_mcp_clients().await?;
+
+        for (name, client) in mcp_clients {
+            println!("load MCP tool: {}", name);
+            let server = client.peer().clone();
+            let tools = get_mcp_tools(server).await?;
+
+            for tool in tools {
+                println!("add tool: {}", tool.name());
+                tool_set.add_tool(tool);
+            }
+        }
+    }
+
     let (mut node, events) = DoraNode::init_from_env()?;
 
     let merged = events.merge_external_send(server_events);
@@ -62,7 +84,7 @@ async fn main() -> eyre::Result<()> {
                     server_result.context("server failed")?;
                     break;
                 }
-                ServerEvent::ChatCompletionRequest { request, reply } => {
+                ServerEvent::CompletionRequest { request, reply } => {
                     let texts = request.to_texts();
                     node.send_output(
                         output_id.clone(),
@@ -141,8 +163,8 @@ async fn main() -> eyre::Result<()> {
 
 enum ServerEvent {
     Result(eyre::Result<()>),
-    ChatCompletionRequest {
-        request: ChatCompletionRequest,
+    CompletionRequest {
+        request: CompletionRequest,
         reply: oneshot::Sender<ChatCompletionObject>,
     },
 }
