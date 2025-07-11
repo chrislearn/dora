@@ -50,24 +50,10 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    let mut tool_set = ToolSet::default();
-
-    let config = config::get();
-    // load MCP
-    if config.mcp.is_some() {
-        let mcp_clients = config.create_mcp_clients().await?;
-
-        for (name, client) in mcp_clients {
-            println!("load MCP tool: {}", name);
-            let server = client.peer().clone();
-            let tools = get_mcp_tools(server).await?;
-
-            for tool in tools {
-                println!("add tool: {}", tool.name());
-                tool_set.add_tool(tool);
-            }
-        }
-    }
+    let mut chat_session = config::get()
+        .create_session()
+        .await
+        .context("failed to create chat session")?;
 
     let (mut node, events) = DoraNode::init_from_env()?;
 

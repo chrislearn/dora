@@ -4,6 +4,7 @@ use eyre::Result;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
+use crate::config::GeminiConfig;
 use crate::DataId;
 
 #[async_trait]
@@ -11,17 +12,15 @@ pub trait ChatClient: Send + Sync {
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse>;
 }
 
-pub struct OpenAIClient {
+pub struct GeminiClient {
     api_key: String,
+    api_url: String,
     client: HttpClient,
-    base_url: String,
 }
 
-impl OpenAIClient {
-    pub fn new(api_key: String, url: Option<String>, proxy: Option<bool>) -> Self {
-        let base_url = url.unwrap_or("https://api.openai.com/v1/chat/completions".to_string());
-        let proxy = proxy.unwrap_or(false);
-        let client = if proxy {
+impl GeminiClient {
+    pub fn new(config: &GeminiConfig) -> Self {
+        let client = if config.proxy {
             HttpClient::new()
         } else {
             HttpClient::builder()
@@ -31,25 +30,20 @@ impl OpenAIClient {
         };
 
         Self {
-            api_key,
+            api_key: config.api_key.clone(),
+            api_url: config.api_url.clone(),
             client,
-            base_url,
         }
-    }
-
-    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.base_url = base_url.into();
-        self
     }
 }
 
 #[async_trait]
-impl ChatClient for OpenAIClient {
+impl ChatClient for GeminiClient {
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
         let response = self
             .client
-            .post(&self.base_url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .post(&self.api_url)
+            .header("X-goog-api-key", self.api_key.clone())
             .header("Content-Type", "application/json")
             .json(&request)
             .send()

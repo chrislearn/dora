@@ -10,6 +10,9 @@ use rmcp::model::{ServerInfo, Tool};
 use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
 use serde::{Deserialize, Serialize};
 
+use crate::client::GeminiClient;
+use crate::{ChatSession, ToolSet};
+
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
 pub fn init() {
@@ -54,6 +57,8 @@ pub struct Config {
     #[serde(default = "default_listen_addr")]
     pub listen_addr: String,
 
+    pub gemini: Option<GeminiConfig>,
+
     pub mcp: Option<McpConfig>,
     #[serde(default = "default_false")]
     pub support_tool: bool,
@@ -63,6 +68,19 @@ fn default_listen_addr() -> String {
 }
 fn default_false() -> bool {
     false
+}
+fn default_gemini_api_url() -> String {
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        .to_owned()
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct GeminiConfig {
+    pub api_key: String,
+    #[serde(default = "default_gemini_api_url")]
+    pub api_url: String,
+    #[serde(default = "default_false")]
+    pub proxy: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -140,5 +158,33 @@ impl Config {
         }
 
         Ok(clients)
+    }
+
+    pub async fn create_session(&self) -> eyre::Result<ChatSession> {
+        let mut tool_set = ToolSet::default();
+
+        if self.mcp.is_some() {
+            let mcp_clients = self.create_mcp_clients().await?;
+
+            for (name, client) in mcp_clients {
+                println!("load MCP tool: {}", name);
+                let server = client.peer().clone();
+                let tools = crate::get_mcp_tools(server).await?;
+
+                for tool in tools {
+                    tool_set.add_tool(tool);
+                }
+            }
+        }
+
+        let gemini_config = self.gemini.as_ref().ok_or_else(|| {
+            eyre::eyre!("Gemini configuration is missing. Please check your config file.")
+        })?;
+        let gemini_client = Arc::new(GeminiClient::new(gemini_config));
+        Ok(ChatSession::new(
+            gemini_client,
+            tool_set,
+            Some("gpt-4o-mini".to_string()),
+        ))
     }
 }
