@@ -1,0 +1,15 @@
+[gemini]
+api_key = "AIzaSyC_kTTfK6C-737Xn10or9RdwkKCqAnioR8"
+api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+[deepseek]
+api_key = "sk-4e77fa0ceae14dc2af3303c9ef6233c6"
+api_url = "https://api.deepseek.com"
+
+
+# [mcp]
+# [[mcp.server]]
+# name = "MCP server name"
+# protocol = "stdio"
+# command = "MCP server path"
+# args = [" "]

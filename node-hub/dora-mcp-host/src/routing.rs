@@ -39,12 +39,12 @@ async fn chat_completions(
     depot: &mut Depot,
     res: &mut Response,
 ) -> AppResult<()> {
-    tracing::info!(target: "stdout", "Handling the coming chat completion request.");
+    tracing::info!("Handling the coming chat completion request.");
     let request_tx = depot
         .obtain::<mpsc::Sender<ServerEvent>>()
         .expect("request_tx must be exists");
 
-    tracing::info!(target: "stdout", "Prepare the chat completion request.");
+    tracing::info!("Prepare the chat completion request.");
 
     let mut chat_request = req.parse_json::<CompletionRequest>().await?;
 
@@ -55,7 +55,7 @@ async fn chat_completions(
     let id = chat_request.user.clone().unwrap();
 
     // log user id
-    tracing::info!(target: "stdout", "user: {}", chat_request.user.clone().unwrap());
+    tracing::info!("user: {}", chat_request.user.clone().unwrap());
     let stream = chat_request.stream;
 
     let (tx, rx) = oneshot::channel();
@@ -83,6 +83,6 @@ async fn chat_completions(
         let _ = res.add_header("user", id, true);
         res.render(Json(chat_completion_object));
     };
-    tracing::info!(target: "stdout", "Send the chat completion response.");
+    tracing::info!("Send the chat completion response.");
     Ok(())
 }

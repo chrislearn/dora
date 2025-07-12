@@ -10,7 +10,7 @@ use rmcp::model::{ServerInfo, Tool};
 use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
 use serde::{Deserialize, Serialize};
 
-use crate::client::GeminiClient;
+use crate::client::{DeepseekClient, GeminiClient};
 use crate::{ChatSession, ToolSet};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -58,6 +58,7 @@ pub struct Config {
     pub listen_addr: String,
 
     pub gemini: Option<GeminiConfig>,
+    pub deepseek: Option<DeepseekConfig>,
 
     pub mcp: Option<McpConfig>,
     #[serde(default = "default_false")]
@@ -76,6 +77,15 @@ fn default_gemini_api_url() -> String {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GeminiConfig {
+    pub api_key: String,
+    #[serde(default = "default_gemini_api_url")]
+    pub api_url: String,
+    #[serde(default = "default_false")]
+    pub proxy: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeepseekConfig {
     pub api_key: String,
     #[serde(default = "default_gemini_api_url")]
     pub api_url: String,
@@ -177,12 +187,22 @@ impl Config {
             }
         }
 
-        let gemini_config = self.gemini.as_ref().ok_or_else(|| {
-            eyre::eyre!("Gemini configuration is missing. Please check your config file.")
+        // let gemini_config = self.gemini.as_ref().ok_or_else(|| {
+        //     eyre::eyre!("Gemini configuration is missing. Please check your config file.")
+        // })?;
+        // let gemini_client = Arc::new(GeminiClient::new(gemini_config));
+        // Ok(ChatSession::new(
+        //     gemini_client,
+        //     tool_set,
+        //     Some("gpt-4o-mini".to_string()),
+        // ))
+        
+        let deepseek_config = self.deepseek.as_ref().ok_or_else(|| {
+            eyre::eyre!("deepseek configuration is missing. Please check your config file.")
         })?;
-        let gemini_client = Arc::new(GeminiClient::new(gemini_config));
+        let deepseek_client = Arc::new(DeepseekClient::new(deepseek_config));
         Ok(ChatSession::new(
-            gemini_client,
+            deepseek_client,
             tool_set,
             Some("gpt-4o-mini".to_string()),
         ))

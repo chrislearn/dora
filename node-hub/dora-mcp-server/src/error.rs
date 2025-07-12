@@ -49,12 +49,12 @@ impl Writer for AppError {
         res.status_code(code);
         let data = match self {
             AppError::Salvo(_e) => {
-                StatusError::internal_server_error().brief("Unknown error happened in salvo.")
+                StatusError::internal_server_error().brief(e.to_string())
             }
             AppError::Public(msg) => StatusError::internal_server_error().brief(msg),
             AppError::Internal(_msg) => StatusError::internal_server_error(),
             AppError::StatusError(e) => e,
-            _ => StatusError::internal_server_error().brief("Unknown error happened."),
+            _ => StatusError::internal_server_error().brief(e.to_string()),
         };
         res.render(data);
     }

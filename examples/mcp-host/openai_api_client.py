@@ -2,7 +2,9 @@
 
 from openai import OpenAI
 
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="dummy_api_key")
+client = OpenAI(base_url="http://127.0.0.1:8008/v1", api_key="dummy_api_key", default_headers={
+        "no_proxy": "*" 
+    })
 
 
 def test_list_models():

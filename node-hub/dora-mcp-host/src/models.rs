@@ -510,34 +510,38 @@ pub struct Function {
 /// Defines the types of a user message content.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum ChatCompletionUserMessageContent {
+pub enum ChatCompletionContent {
     /// The text contents of the message.
     Text(String),
     /// An array of content parts with a defined type, each can be of type `text` or `image_url` when passing in images.
     /// It is required that there must be one content part of type `text` at least. Multiple images are allowed by adding multiple image_url content parts.
     Parts(Vec<ContentPart>),
 }
-impl ChatCompletionUserMessageContent {
+impl ChatCompletionContent {
     pub fn ty(&self) -> &str {
         match self {
-            ChatCompletionUserMessageContent::Text(_) => "text",
-            ChatCompletionUserMessageContent::Parts(_) => "parts",
+            ChatCompletionContent::Text(_) => "text",
+            ChatCompletionContent::Parts(_) => "parts",
         }
+    }
+
+    pub fn new_text(text: impl Into<String>) -> Self {
+        ChatCompletionContent::Text(text.into())
     }
 
     pub fn to_texts(&self) -> Vec<String> {
         match self {
-            ChatCompletionUserMessageContent::Text(text) => {
+            ChatCompletionContent::Text(text) => {
                 vec![String::from("user: ") + &text.clone()]
             }
-            ChatCompletionUserMessageContent::Parts(parts) => parts
+            ChatCompletionContent::Parts(parts) => parts
                 .iter()
                 .map(|part| match part {
                     ContentPart::Text(text_part) => {
-                        String::from("<|user|>\n<|im_start|>\n") + &text_part.text.clone()
+                        String::from("<<|im_start|>\n") + &text_part.text.clone()
                     }
                     ContentPart::Image(image) => {
-                        String::from("<|user|>\n<|vision_start|>\n") + &image.image().url.clone()
+                        String::from("<<|vision_start|>\n") + &image.image().url.clone()
                     }
                 })
                 .collect(),
@@ -767,7 +771,7 @@ impl ChatCompletionSystemMessage {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ChatCompletionUserMessage {
     /// The contents of the user message.
-    content: ChatCompletionUserMessageContent,
+    content: ChatCompletionContent,
     /// An optional name for the participant. Provides the model information to differentiate between participants of the same role.
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
@@ -780,7 +784,7 @@ impl ChatCompletionUserMessage {
     /// * `content` - The contents of the user message.
     ///
     /// * `name` - An optional name for the participant. Provides the model information to differentiate between participants of the same role.
-    pub fn new(content: ChatCompletionUserMessageContent, name: Option<String>) -> Self {
+    pub fn new(content: ChatCompletionContent, name: Option<String>) -> Self {
         Self { content, name }
     }
 
@@ -788,7 +792,7 @@ impl ChatCompletionUserMessage {
         ChatCompletionRole::User
     }
 
-    pub fn content(&self) -> &ChatCompletionUserMessageContent {
+    pub fn content(&self) -> &ChatCompletionContent {
         &self.content
     }
 
@@ -923,7 +927,7 @@ pub struct CompletionResponse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatCompletionMessage {
     pub role: String,
-    pub content: String,
+    pub content: ChatCompletionContent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
 }
@@ -932,7 +936,7 @@ impl ChatCompletionMessage {
     pub fn system(content: impl ToString) -> Self {
         Self {
             role: "system".to_string(),
-            content: content.to_string(),
+            content: ChatCompletionContent::new_text(content.to_string()),
             tool_calls: None,
         }
     }
@@ -940,7 +944,7 @@ impl ChatCompletionMessage {
     pub fn user(content: impl ToString) -> Self {
         Self {
             role: "user".to_string(),
-            content: content.to_string(),
+            content: ChatCompletionContent::new_text(content.to_string()),
             tool_calls: None,
         }
     }
@@ -948,26 +952,18 @@ impl ChatCompletionMessage {
     pub fn assistant(content: impl ToString) -> Self {
         Self {
             role: "assistant".to_string(),
-            content: content.to_string(),
+            content: ChatCompletionContent::new_text(content.to_string()),
             tool_calls: None,
         }
     }
 
     /// The contents of the message.
     pub fn to_texts(&self) -> Vec<String> {
-        match &*self.role {
-            "system" => {
-                vec![String::from("<|system|>\n") + &self.content]
-            }
-            "user" => vec![String::from("<|user|>\n") + &self.content.clone()],
-            "assistant" => {
-                vec![String::from("<|assistant|>\n") + &self.content.clone()]
-            }
-            "tool" => {
-                vec![String::from("<|tool|>\n") + &self.content.clone()]
-            }
-            _ => vec![String::from("<|unknown|>\n") + &self.content.clone()],
-        }
+        self.content
+            .to_texts()
+            .into_iter()
+            .map(|text| format!("<|{}|>\n{}", self.role, text))
+            .collect()
     }
 }
 

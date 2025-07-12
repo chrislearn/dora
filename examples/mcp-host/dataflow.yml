@@ -1,7 +1,7 @@
 nodes:
-  - id: dora-ai-agent
-    build: cargo build -p dora-ai-agent --release
-    path: ../../target/release/dora-ai-agent
+  - id: dora-mcp-host
+    build: cargo build -p dora-mcp-host --release
+    path: ../../target/release/dora-mcp-host
     outputs:
       - text
     inputs:
@@ -11,6 +11,6 @@ nodes:
     build: pip install -e ../../node-hub/dora-echo
     path: dora-echo
     inputs:
-      echo: dora-ai-agent/text
+      echo: dora-mcp-host/text
     outputs:
       - echo

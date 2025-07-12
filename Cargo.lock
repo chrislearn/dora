@@ -3259,31 +3259,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dora-ai-agent"
-version = "0.3.12"
-dependencies = [
- "chrono",
- "dora-node-api",
- "eyre",
- "figment",
- "futures",
- "indexmap 2.8.0",
- "mime_guess",
- "reqwest",
- "rmcp",
- "rust-embed",
- "salvo",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tokio-stream",
- "tracing",
- "url",
- "uuid 1.16.0",
-]
-
-[[package]]
 name = "dora-arrow-convert"
 version = "0.3.12"
 dependencies = [
@@ -3476,6 +3451,31 @@ dependencies = [
  "serde_json",
  "serial",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "dora-mcp-host"
+version = "0.3.12"
+dependencies = [
+ "chrono",
+ "dora-node-api",
+ "eyre",
+ "figment",
+ "futures",
+ "indexmap 2.8.0",
+ "mime_guess",
+ "reqwest",
+ "rmcp",
+ "rust-embed",
+ "salvo",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "url",
+ "uuid 1.16.0",
 ]
 
 [[package]]

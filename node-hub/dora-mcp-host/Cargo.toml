@@ -1,5 +1,5 @@
 [package]
-name = "dora-ai-agent"
+name = "dora-mcp-host"
 version.workspace = true
 edition.workspace = true
 documentation.workspace = true

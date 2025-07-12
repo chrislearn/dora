@@ -47,28 +47,30 @@ impl ChatSession {
             }
         } else {
             // check if message contains tool call
-            if response.content.contains("Tool:") {
-                let lines: Vec<&str> = response.content.split('\n').collect();
-                // simple parse tool call
-                let mut tool_name = None;
-                let mut args_text = Vec::new();
-                let mut parsing_args = false;
+            for text in response.content.to_texts() {
+                if text.contains("Tool:") {
+                    let lines: Vec<&str> = text.split('\n').collect();
+                    // simple parse tool call
+                    let mut tool_name = None;
+                    let mut args_text = Vec::new();
+                    let mut parsing_args = false;
 
-                for line in lines {
-                    if line.starts_with("Tool:") {
-                        tool_name = line.strip_prefix("Tool:").map(|s| s.trim().to_string());
-                        parsing_args = false;
-                    } else if line.starts_with("Inputs:") {
-                        parsing_args = true;
-                    } else if parsing_args {
-                        args_text.push(line.trim());
+                    for line in lines {
+                        if line.starts_with("Tool:") {
+                            tool_name = line.strip_prefix("Tool:").map(|s| s.trim().to_string());
+                            parsing_args = false;
+                        } else if line.starts_with("Inputs:") {
+                            parsing_args = true;
+                        } else if parsing_args {
+                            args_text.push(line.trim());
+                        }
                     }
-                }
-                if let Some(name) = tool_name {
-                    tool_calls_func.push(ToolFunction {
-                        name,
-                        arguments: args_text.join("\n"),
-                    });
+                    if let Some(name) = tool_name {
+                        tool_calls_func.push(ToolFunction {
+                            name,
+                            arguments: args_text.join("\n"),
+                        });
+                    }
                 }
             }
         }
@@ -171,7 +173,7 @@ impl ChatSession {
             let response = self.client.complete(request).await?;
             // get choice
             let choice = response.choices.first().unwrap();
-            println!("AI > {}", choice.message.content);
+            println!("AI > {:#?}", choice.message.to_texts());
             // analyze tool call
             self.analyze_tool_call(&choice.message).await;
         }
