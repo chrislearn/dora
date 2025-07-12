@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use eyre::{Context, ContextCompat};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
@@ -7,14 +9,15 @@ use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
 
 use crate::models::*;
+use crate::session::ChatSession;
 use crate::{AppError, AppResult, ServerEvent};
 
 #[derive(RustEmbed)]
 #[folder = "static"]
 struct Assets;
 
-pub fn root(server_events_tx: mpsc::Sender<ServerEvent>) -> Router {
-    Router::with_hoop(affix_state::inject(server_events_tx))
+pub fn root(server_events_tx: mpsc::Sender<ServerEvent>, chat_session: Arc<ChatSession>) -> Router {
+    Router::with_hoop(affix_state::inject(server_events_tx).inject(chat_session))
         .push(
             Router::with_path("v1")
                 .push(Router::with_path("chat/completions").post(chat_completions))
@@ -43,6 +46,9 @@ async fn chat_completions(
     let request_tx = depot
         .obtain::<mpsc::Sender<ServerEvent>>()
         .expect("request_tx must be exists");
+    let chat_session = depot
+        .obtain::<Arc<ChatSession>>()
+        .expect("chat session must be exists");
 
     tracing::info!("Prepare the chat completion request.");
 
@@ -58,31 +64,32 @@ async fn chat_completions(
     tracing::info!("user: {}", chat_request.user.clone().unwrap());
     let stream = chat_request.stream;
 
-    let (tx, rx) = oneshot::channel();
-    request_tx
-        .send(ServerEvent::CompletionRequest {
-            request: chat_request,
-            reply: tx,
-        })
-        .await?;
+    // let (tx, rx) = oneshot::channel();
+    // request_tx
+    //     .send(ServerEvent::CompletionRequest {
+    //         request: chat_request,
+    //         reply: tx,
+    //     })
+    //     .await?;
 
-    if let Some(true) = stream {
-        let result = async {
-            let chat_completion_object = rx.await?;
-            Ok::<_, AppError>(serde_json::to_string(&chat_completion_object)?)
-        };
-        let stream = futures::stream::once(result);
+    // if let Some(true) = stream {
+    //     // let result = async {
+    //     //     let chat_completion_object = rx.await?;
+    //     //     Ok::<_, AppError>(serde_json::to_string(&chat_completion_object)?)
+    //     // };
+    //     let result = chat_session.chat(chat_request).await?;
+    //     let stream = futures::stream::once(result);
 
-        let _ = res.add_header("Content-Type", "text/event-stream", true);
-        let _ = res.add_header("Cache-Control", "no-cache", true);
-        let _ = res.add_header("Connection", "keep-alive", true);
+    //     let _ = res.add_header("Content-Type", "text/event-stream", true);
+    //     let _ = res.add_header("Cache-Control", "no-cache", true);
+    //     let _ = res.add_header("Connection", "keep-alive", true);
+    //     let _ = res.add_header("user", id, true);
+    //     res.stream(stream);
+    // } else {
+        let response = chat_session.chat(chat_request).await.unwrap();
         let _ = res.add_header("user", id, true);
-        res.stream(stream);
-    } else {
-        let chat_completion_object = rx.await?;
-        let _ = res.add_header("user", id, true);
-        res.render(Json(chat_completion_object));
-    };
+        res.render(Json(response));
+    // };
     tracing::info!("Send the chat completion response.");
     Ok(())
 }

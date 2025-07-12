@@ -538,10 +538,10 @@ impl ChatCompletionContent {
                 .iter()
                 .map(|part| match part {
                     ContentPart::Text(text_part) => {
-                        String::from("<<|im_start|>\n") + &text_part.text.clone()
+                        String::from("<|im_start|>\n") + &text_part.text.clone()
                     }
                     ContentPart::Image(image) => {
-                        String::from("<<|vision_start|>\n") + &image.image().url.clone()
+                        String::from("<|vision_start|>\n") + &image.image().url.clone()
                     }
                 })
                 .collect(),

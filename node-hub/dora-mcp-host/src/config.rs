@@ -204,7 +204,7 @@ impl Config {
         Ok(ChatSession::new(
             deepseek_client,
             tool_set,
-            Some("gpt-4o-mini".to_string()),
+            Some("deepseek-chat".to_string()),
         ))
     }
 }

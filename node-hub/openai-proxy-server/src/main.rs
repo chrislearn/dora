@@ -290,7 +290,6 @@ async fn chat_completions_handler(
     mut req: Request<Body>,
     request_tx: mpsc::Sender<ServerEvent>,
 ) -> Response<Body> {
-    println!("XXXXXXXXXXxx");
     info!(target: "stdout", "Handling the coming chat completion request.");
 
     if req.method().eq(&hyper::http::Method::OPTIONS) {
@@ -314,7 +313,6 @@ async fn chat_completions_handler(
         }
     }
 
-    println!("XXXXXXXXXXxx 1");
     info!(target: "stdout", "Prepare the chat completion request.");
 
     // parse request
@@ -329,11 +327,9 @@ async fn chat_completions_handler(
             return error::internal_server_error(err_msg);
         }
     };
-    println!("XXXXXXXXXXxx 2");
     let mut chat_request: ChatCompletionRequest = match serde_json::from_slice(&body_bytes) {
         Ok(chat_request) => chat_request,
         Err(e) => {
-            println!("EEEEEEEEEEEEEEEError");
             let mut err_msg = format!("Fail to deserialize chat completion request: {}.", e);
 
             if let Ok(json_value) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
@@ -346,7 +342,6 @@ async fn chat_completions_handler(
             return error::bad_request(err_msg);
         }
     };
-    println!("XXXXXXXXXXxx 3  {chat_request:#?}");
 
     // check if the user id is provided
     if chat_request.user.is_none() {
@@ -354,13 +349,11 @@ async fn chat_completions_handler(
     };
     let id = chat_request.user.clone().unwrap();
 
-    println!("XXXXXXXXXXxx 4");
     // log user id
     info!(target: "stdout", "user: {}", chat_request.user.clone().unwrap());
     let stream = chat_request.stream;
 
     let (tx, rx) = oneshot::channel();
-    println!("XXXXXXXXXXxx 5");
     if let Err(err) = request_tx
         .send(ServerEvent::ChatCompletionRequest {
             request: chat_request,
@@ -372,7 +365,6 @@ async fn chat_completions_handler(
         return error::internal_server_error(format!("{err:?}"));
     }
 
-    println!("XXXXXXXXXXxx 6");
     let res = if let Some(true) = stream {
         let result = async {
             let chat_completion_object = rx

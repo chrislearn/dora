@@ -8,7 +8,7 @@ use serde_json;
 
 use crate::client::ChatClient;
 use crate::{
-    models::{ChatCompletionMessage, CompletionRequest, ToolFunction},
+    models::{ChatCompletionMessage, CompletionResponse, CompletionRequest, ToolFunction},
     tool::{Tool as ToolTrait, ToolSet},
 };
 
@@ -16,7 +16,7 @@ pub struct ChatSession {
     client: Arc<dyn ChatClient>,
     tool_set: ToolSet,
     model: Option<String>,
-    messages: Vec<ChatCompletionMessage>,
+    // messages: Vec<ChatCompletionMessage>,
 }
 
 impl ChatSession {
@@ -25,19 +25,19 @@ impl ChatSession {
             client,
             tool_set,
             model,
-            messages: Vec::new(),
+            // messages: Vec::new(),
         }
     }
 
     pub fn add_system_prompt(&mut self, prompt: impl ToString) {
-        self.messages.push(ChatCompletionMessage::system(prompt));
+        // self.messages.push(ChatCompletionMessage::system(prompt));
     }
 
     pub fn get_tools(&self) -> Vec<Arc<dyn ToolTrait>> {
         self.tool_set.tools()
     }
 
-    pub async fn analyze_tool_call(&mut self, response: &ChatCompletionMessage) {
+    pub async fn analyze_tool_call(& self, response: &ChatCompletionMessage) {
         let mut tool_calls_func = Vec::new();
         if let Some(tool_calls) = response.tool_calls.as_ref() {
             for tool_call in tool_calls {
@@ -85,9 +85,9 @@ impl ChatSession {
                 match tool.call(args).await {
                     Ok(result) => {
                         if result.is_error.is_some_and(|b| b) {
-                            self.messages.push(ChatCompletionMessage::user(
-                                "tool call failed, mcp call error",
-                            ));
+                            // self.messages.push(ChatCompletionMessage::user(
+                            //     "tool call failed, mcp call error",
+                            // ));
                         } else {
                             result.content.iter().for_each(|content| {
                                 if let Some(content_text) = content.as_text() {
@@ -98,20 +98,20 @@ impl ChatSession {
                                     let pretty_result =
                                         serde_json::to_string_pretty(&json_result).unwrap();
                                     println!("call tool result: {}", pretty_result);
-                                    self.messages.push(ChatCompletionMessage::user(format!(
-                                        "call tool result: {}",
-                                        pretty_result
-                                    )));
+                                    // self.messages.push(ChatCompletionMessage::user(format!(
+                                    //     "call tool result: {}",
+                                    //     pretty_result
+                                    // )));
                                 }
                             });
                         }
                     }
                     Err(e) => {
                         println!("tool call failed: {}", e);
-                        self.messages.push(ChatCompletionMessage::user(format!(
-                            "tool call failed: {}",
-                            e
-                        )));
+                        // self.messages.push(ChatCompletionMessage::user(format!(
+                        //     "tool call failed: {}",
+                        //     e
+                        // )));
                     }
                 }
             } else {
@@ -119,65 +119,37 @@ impl ChatSession {
             }
         }
     }
-    pub async fn chat(&mut self, support_tool: bool) -> Result<()> {
-        println!("welcome to use simple chat client, use 'exit' to quit");
+    pub async fn chat(& self, mut request: CompletionRequest) -> Result<CompletionResponse> {
+        // self.messages.push(ChatCompletionMessage::user(&input));
 
-        loop {
-            print!("> ");
-            io::stdout().flush()?;
+        let tools = self.tool_set.tools();
+        let tool_definitions = if !tools.is_empty() {
+            Some(
+                tools
+                    .iter()
+                    .map(|tool| crate::models::ToolInfo {
+                        name: tool.name(),
+                        description: tool.description(),
+                        parameters: tool.parameters(),
+                    })
+                    .collect(),
+            )
+        } else {
+            None
+        };
 
-            let mut input = String::new();
-            io::stdin().read_line(&mut input)?;
-            input = input.trim().to_string();
 
-            if input.is_empty() {
-                continue;
-            }
+        request.model = self.model.clone();
+        request.tools = tool_definitions;
 
-            if input == "exit" {
-                break;
-            }
+        // send request
+        let response = self.client.complete(request).await?;
+        // get choice
+        let choice = response.choices.first().unwrap();
+        println!("AI > {:#?}", choice.message.to_texts());
+        // analyze tool call
+        self.analyze_tool_call(&choice.message).await;
 
-            self.messages.push(ChatCompletionMessage::user(&input));
-            let tool_definitions = if support_tool {
-                // prepare tool list
-                let tools = self.tool_set.tools();
-                if !tools.is_empty() {
-                    Some(
-                        tools
-                            .iter()
-                            .map(|tool| crate::models::ToolInfo {
-                                name: tool.name(),
-                                description: tool.description(),
-                                parameters: tool.parameters(),
-                            })
-                            .collect(),
-                    )
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            // create request
-            let request = CompletionRequest {
-                model: self.model.clone(),
-                messages: self.messages.clone(),
-                temperature: Some(0.7),
-                tools: tool_definitions,
-                ..Default::default()
-            };
-
-            // send request
-            let response = self.client.complete(request).await?;
-            // get choice
-            let choice = response.choices.first().unwrap();
-            println!("AI > {:#?}", choice.message.to_texts());
-            // analyze tool call
-            self.analyze_tool_call(&choice.message).await;
-        }
-
-        Ok(())
+        Ok(response)
     }
 }

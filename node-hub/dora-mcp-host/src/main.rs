@@ -35,9 +35,16 @@ async fn main() -> eyre::Result<()> {
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
+    let chat_session = config::get()
+        .create_session()
+        .await
+        .context("failed to create chat session")?;
+
+    let mut reply_channels = VecDeque::new();
+
     let acceptor = TcpListener::new("0.0.0.0:8008").bind().await;
     tokio::spawn(async move {
-        let service = Service::new(routing::root(server_events_tx.clone())).hoop(
+        let service = Service::new(routing::root(server_events_tx.clone(), chat_session.into())).hoop(
             Cors::new()
                 .allow_origin(AllowOrigin::any())
                 .allow_methods(AllowMethods::any())
@@ -50,18 +57,12 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    let mut chat_session = config::get()
-        .create_session()
-        .await
-        .context("failed to create chat session")?;
-
     let (mut node, events) = DoraNode::init_from_env()?;
 
     let merged = events.merge_external_send(server_events);
     let events = futures::executor::block_on_stream(merged);
 
     let output_id = DataId::from("text".to_owned());
-    let mut reply_channels = VecDeque::new();
 
     for event in events {
         match event {
