@@ -1,29 +1,30 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use dora_node_api::{dora_core::config::DataId, ArrowData, Metadata, Parameter};
+use dora_node_api::arrow::array::{AsArray, StringArray};
+use dora_node_api::{
+    dora_core::config::DataId, ArrowData, DoraNode, Metadata, MetadataParameters, Parameter,
+};
 use rmcp::model::{
     CallToolResult, EmptyResult, Implementation, InitializeResult, JsonObject, ListToolsResult,
     ProtocolVersion, Request, ServerCapabilities, ServerInfo, ServerResult, Tool,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::oneshot;
+use tokio::sync::mpsc;
+use futures::channel::oneshot;
+
+use crate::ServerEvent;
 
 #[derive(Debug)]
 pub struct McpServer {
     tools: Vec<Tool>,
     server_info: Implementation,
-    reply_channels: Mutex<HashMap<String, oneshot::Sender<ArrowData>>>,
 }
 
 impl McpServer {
     pub fn new(tools: Vec<Tool>, server_info: Implementation) -> Self {
-        Self {
-            tools,
-            server_info,
-            reply_channels: Default::default(),
-        }
+        Self { tools, server_info }
     }
 
     pub fn tools(&self) -> &[Tool] {
@@ -54,25 +55,27 @@ impl McpServer {
     pub async fn handle_tools_call(
         &self,
         params: JsonObject,
-        mut metadata: Metadata,
+        request_tx: &mpsc::Sender<ServerEvent>,
     ) -> eyre::Result<CallToolResult> {
         let (tx, rx) = oneshot::channel();
-        let call_id = gen_call_id();
-        metadata
-            .parameters
-            .insert("__dora_call_id".to_string(), Parameter::String(call_id));
-        let reply_channels = self
-            .reply_channels
-            .lock()
-            .map_err(|_| eyre::eyre!("Failed to lock reply channels"))?;
-        reply_channels.insert(call_id, tx);
-        Ok(rx.await)
+
+        request_tx
+            .send(ServerEvent::CallNode {
+                node_id: "node_id".into(), // TODO
+                data: serde_json::to_string(&params).unwrap(),
+                reply: tx,
+            })
+            .await?;
+
+        let data: String = rx.await?;
+        Ok(serde_json::from_str(&data)
+            .map_err(|e| eyre::eyre!("Failed to parse call tool result: {}", e))?)
     }
 
     pub async fn handle_request(
         &self,
         request: Request,
-        metata: Metadata,
+        server_events_tx: &mpsc::Sender<ServerEvent>,
     ) -> eyre::Result<ServerResult> {
         let Request {
             method,
@@ -93,32 +96,13 @@ impl McpServer {
                 .await
                 .map(|result| ServerResult::ListToolsResult(result)),
             "tools/call" => self
-                .handle_tools_call(params, metata)
+                .handle_tools_call(params, server_events_tx)
                 .await
                 .map(|result| ServerResult::CallToolResult(result)),
             method => Err(eyre::eyre!("unexpected method: {:#?}", method)),
         }
     }
 
-    pub fn handle_event(
-        &self,
-        id: DataId,
-        data: ArrowData,
-        metadata: Metadata,
-    ) -> eyre::Result<()> {
-        let Some(Parameter::String(call_id)) = metadata.parameters.get("__dora_call_id") else {
-            return Ok(());
-        };
-        let reply_channels = self
-            .reply_channels
-            .lock()
-            .map_err(|_| eyre::eyre!("Failed to lock reply channels"))?;
-        let Some(sender) = reply_channels.remove(call_id) else {
-            return Ok(());
-        };
-        sender.send(data)?;
-        Ok(())
-    }
 }
 
 pub(crate) fn gen_call_id() -> String {

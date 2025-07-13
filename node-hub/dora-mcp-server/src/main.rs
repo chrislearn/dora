@@ -2,11 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dora_node_api::{
-    self,
     arrow::array::{AsArray, StringArray},
     dora_core::config::DataId,
     merged::{MergeExternalSend, MergedEvent},
-    DoraNode, Event,
+    DoraNode, Event, MetadataParameters, Parameter,
 };
 
 use eyre::{Context, ContextCompat};
@@ -21,6 +20,7 @@ use mcp_server::McpServer;
 mod error;
 mod routing;
 use error::AppError;
+use std::collections::VecDeque;
 
 pub type AppResult<T> = Result<T, crate::AppError>;
 
@@ -28,69 +28,138 @@ pub type AppResult<T> = Result<T, crate::AppError>;
 async fn main() -> eyre::Result<()> {
     let (mut node, events) = DoraNode::init_from_env()?;
 
-    let events = futures::executor::block_on_stream(events);
+    let (server_events_tx, server_events_rx) = mpsc::channel(3);
+    let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
+
+    let mut reply_channels: HashMap<String, VecDeque<oneshot::Sender<String>>> = HashMap::new();
 
     let mcp_server = Arc::new(McpServer::new(vec![], Default::default()));
 
     let acceptor = TcpListener::new("0.0.0.0:8008").bind().await;
-    tokio::spawn(async move {
-        let service = Service::new(routing::root(mcp_server.clone()))
-            .hoop(
+    tokio::spawn({
+        let server_events_tx = server_events_tx.clone();
+        let mcp_server = mcp_server.clone();
+        async move {
+            let service = Service::new(routing::root(mcp_server, server_events_tx.clone())).hoop(
                 Cors::new()
                     .allow_origin(AllowOrigin::any())
                     .allow_methods(AllowMethods::any())
                     .allow_headers(AllowHeaders::any())
                     .into_handler(),
             );
-        Server::new(acceptor).serve(service).await;
+            Server::new(acceptor).serve(service).await;
+            if let Err(err) = server_events_tx.send(ServerEvent::Result(Ok(()))).await {
+                tracing::warn!("server result channel closed: {err}");
+            }
+        }
     });
+
+    let merged = events.merge_external_send(server_events);
+    let events = futures::executor::block_on_stream(merged);
 
     for event in events {
         match event {
-            Event::Input {
-                id,
-                data,
-                metadata,
-            } => {
-                match id.as_str() {
-                    "request" => {
-                        let data =
-                            data.as_string::<i32>()
-                                .iter()
-                                .fold("".to_string(), |mut acc, s| {
+            MergedEvent::External(event) => match event {
+                ServerEvent::Result(server_result) => {
+                    server_result.context("server failed")?;
+                    break;
+                }
+                ServerEvent::CallNode {
+                    node_id,
+                    data,
+                    reply,
+                } => {
+                    let mut metadata = MetadataParameters::default();
+                    metadata.insert("__dora_call_id".into(), Parameter::String(node_id.clone()));
+                    node.send_output(
+                        DataId::from(node_id.clone()),
+                        metadata,
+                        StringArray::from(vec![data]),
+                    )
+                    .context("failed to send dora output")?;
+
+                    reply_channels.entry(node_id).or_default().push_back(reply);
+                }
+            },
+            MergedEvent::Dora(event) => match event {
+                Event::Input { id, data, metadata } => {
+                    match id.as_str() {
+                        "request" => {
+                            let data = data.as_string::<i32>().iter().fold(
+                                "".to_string(),
+                                |mut acc, s| {
                                     if let Some(s) = s {
                                         acc.push('\n');
                                         acc.push_str(s);
                                     }
                                     acc
-                                });
+                                },
+                            );
 
-                        let request = serde_json::from_str::<Request>(&data)
-                            .context("failed to parse call tool from string")?;
+                            let request = serde_json::from_str::<Request>(&data)
+                                .context("failed to parse call tool from string")?;
 
-                        if let Ok(result) = mcp_server.handle_request(request, metadata).await {
-                            node.send_output(DataId::from("response".to_owned()), metadata.parameters, result)
+                            if let Ok(result) =
+                                mcp_server.handle_request(request, &server_events_tx).await
+                            {
+                                node.send_output(
+                                    DataId::from("response".to_owned()),
+                                    metadata.parameters,
+                                    StringArray::from(
+                                        vec![serde_json::to_string(&result).unwrap()],
+                                    ),
+                                )
                                 .context("failed to send dora output")?;
+                            }
                         }
-                    }
-                    _ => {
-                        mcp_server.handle_event(id, data, metadata)?;
-                        // node.send_output(DataId::from("response".to_owned()), metadata, data)
-                        //     .context("failed to send dora output")?;
-                    }
-                };
-            }
-            Event::Stop(_) => {
-                break;
-            }
-            Event::InputClosed { id, .. } => {
-                tracing::info!("Input channel closed for id: {}", id);
-            }
-            event => {
-                eyre::bail!("unexpected event: {:#?}", event)
-            }
+                        _ => {
+                            let Some(Parameter::String(call_id)) =
+                                metadata.parameters.get("__dora_call_id")
+                            else {
+                                tracing::warn!("No call ID found in metadata for id: {}", id);
+                                continue;
+                            };
+                            let reply_channel = reply_channels
+                                .get_mut(call_id)
+                                .and_then(|channels| channels.pop_front())
+                                .context("no reply channel")?;
+                            let data = data.as_string::<i32>();
+                            let data = data.iter().fold("".to_string(), |mut acc, s| {
+                                if let Some(s) = s {
+                                    acc.push('\n');
+                                    acc.push_str(s);
+                                }
+                                acc
+                            });
+                            if reply_channel.send(data).is_err() {
+                                tracing::warn!("failed to send chat completion reply because channel closed early");
+                            }
+                            // node.send_output(DataId::from("response".to_owned()), metadata, data)
+                            //     .context("failed to send dora output")?;
+                        }
+                    };
+                }
+                Event::Stop(_) => {
+                    break;
+                }
+                Event::InputClosed { id, .. } => {
+                    tracing::info!("Input channel closed for id: {}", id);
+                }
+                event => {
+                    eyre::bail!("unexpected event: {:#?}", event)
+                }
+            },
         }
     }
 
     Ok(())
+}
+
+enum ServerEvent {
+    Result(eyre::Result<()>),
+    CallNode {
+        node_id: String,
+        data: String,
+        reply: oneshot::Sender<String>,
+    },
 }
