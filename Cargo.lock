@@ -3489,6 +3489,7 @@ dependencies = [
  "indexmap 2.8.0",
  "mime_guess",
  "rmcp",
+ "salvo",
  "serde",
  "serde_json",
  "thiserror 2.0.12",

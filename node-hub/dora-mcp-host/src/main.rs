@@ -85,7 +85,7 @@ async fn main() -> eyre::Result<()> {
             },
             MergedEvent::Dora(event) => match event {
                 Event::Input {
-                    id,
+                    id, 
                     data,
                     metadata: _,
                 } => {
