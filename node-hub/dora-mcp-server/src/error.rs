@@ -3,8 +3,6 @@ use salvo::http::{StatusCode, StatusError};
 use salvo::prelude::{Depot, Request, Response, Writer};
 use thiserror::Error;
 
-use crate::ServerEvent;
-
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("public: `{0}`")]
@@ -21,10 +19,10 @@ pub enum AppError {
     HttpParse(#[from] salvo::http::ParseError),
     #[error("recv: `{0}`")]
     Recv(#[from] tokio::sync::oneshot::error::RecvError),
-    #[error("send: `{0}`")]
-    Send(#[from] tokio::sync::mpsc::error::SendError<ServerEvent>),
     #[error("canceled: `{0}`")]
     Canceled(#[from] futures::channel::oneshot::Canceled),
+    #[error("error report: `{0}`")]
+    ErrReport(#[from] eyre::Report),
     // #[error("reqwest: `{0}`")]
     // Reqwest(#[from] reqwest::Error),
 }
@@ -48,13 +46,13 @@ impl Writer for AppError {
         };
         res.status_code(code);
         let data = match self {
-            AppError::Salvo(_e) => {
+            AppError::Salvo(e) => {
                 StatusError::internal_server_error().brief(e.to_string())
             }
             AppError::Public(msg) => StatusError::internal_server_error().brief(msg),
             AppError::Internal(_msg) => StatusError::internal_server_error(),
             AppError::StatusError(e) => e,
-            _ => StatusError::internal_server_error().brief(e.to_string()),
+            e => StatusError::internal_server_error().brief(e.to_string()),
         };
         res.render(data);
     }

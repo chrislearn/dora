@@ -18,8 +18,8 @@ use tokio::sync::mpsc;
 
 mod mcp_server;
 use mcp_server::McpServer;
-mod routing;
 mod error;
+mod routing;
 use error::AppError;
 
 pub type AppResult<T> = Result<T, crate::AppError>;
@@ -30,12 +30,11 @@ async fn main() -> eyre::Result<()> {
 
     let events = futures::executor::block_on_stream(events);
 
-    let mut reply_channels = HashMap::new();
     let mcp_server = Arc::new(McpServer::new(vec![], Default::default()));
 
     let acceptor = TcpListener::new("0.0.0.0:8008").bind().await;
     tokio::spawn(async move {
-        let service = Service::new(routing::root(server_events_tx.clone(), mcp_server.clone()))
+        let service = Service::new(routing::root(mcp_server.clone()))
             .hoop(
                 Cors::new()
                     .allow_origin(AllowOrigin::any())
@@ -44,9 +43,6 @@ async fn main() -> eyre::Result<()> {
                     .into_handler(),
             );
         Server::new(acceptor).serve(service).await;
-        if let Err(err) = server_events_tx.send(ServerEvent::Result(Ok(()))).await {
-            tracing::warn!("server result channel closed: {err}");
-        }
     });
 
     for event in events {
@@ -54,7 +50,7 @@ async fn main() -> eyre::Result<()> {
             Event::Input {
                 id,
                 data,
-                metadata: _,
+                metadata,
             } => {
                 match id.as_str() {
                     "request" => {
@@ -72,8 +68,9 @@ async fn main() -> eyre::Result<()> {
                         let request = serde_json::from_str::<Request>(&data)
                             .context("failed to parse call tool from string")?;
 
-                        if let Some(tx) = server.handle_request(request, metadata) {
-                            reply_channels.insert(call_id, tx);
+                        if let Ok(result) = mcp_server.handle_request(request, metadata).await {
+                            node.send_output(DataId::from("response".to_owned()), metadata.parameters, result)
+                                .context("failed to send dora output")?;
                         }
                     }
                     _ => {

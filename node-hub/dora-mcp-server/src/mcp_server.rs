@@ -1,23 +1,28 @@
-use std::{collections::HashMap, fs::Metadata};
+use std::collections::HashMap;
+use std::sync::Mutex;
 
-use dora_node_api::{dora_core::config::DataId, ArrowData};
-use rmcp::model::{JsonObject, Request, ServerInfo, Tool};
+use dora_node_api::{dora_core::config::DataId, ArrowData, Metadata, Parameter};
+use rmcp::model::{
+    CallToolResult, EmptyResult, Implementation, InitializeResult, JsonObject, ListToolsResult,
+    ProtocolVersion, Request, ServerCapabilities, ServerInfo, ServerResult, Tool,
+};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;use tokio::sync::oneshot;
+use serde_json::Value;
+use tokio::sync::oneshot;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Debug)]
 pub struct McpServer {
     tools: Vec<Tool>,
-    info: ServerInfo,
-    channels: HashMap,
+    server_info: Implementation,
+    reply_channels: Mutex<HashMap<String, oneshot::Sender<ArrowData>>>,
 }
 
 impl McpServer {
-    pub fn new(tools: Vec<Tool>, info: ServerInfo) -> Self {
+    pub fn new(tools: Vec<Tool>, server_info: Implementation) -> Self {
         Self {
             tools,
-            info,
-            channels: Default::default(),
+            server_info,
+            reply_channels: Default::default(),
         }
     }
 
@@ -25,32 +30,73 @@ impl McpServer {
         &self.tools
     }
 
-    pub fn info(&self) -> &ServerInfo {
-        &self.info
+    pub fn server_info(&self) -> &Implementation {
+        &self.server_info
     }
 
-    pub async fn handle_ping(&self) {}
-    pub async fn handle_tools_list(&self) -> eyre::Result<Vec<Tool>> {}
-    pub async fn handle_tools_call(&self, params: JsonObject, mut metadata: Metadata) {
+    pub async fn handle_ping(&self) -> eyre::Result<EmptyResult> {
+        Ok(EmptyResult {})
+    }
+    pub async fn handle_initialize(&self) -> eyre::Result<InitializeResult> {
+        Ok(InitializeResult {
+            protocol_version: ProtocolVersion::V_2025_03_26,
+            server_info: self.server_info.clone(),
+            capabilities: ServerCapabilities::default(),
+            instructions: None,
+        })
+    }
+    pub async fn handle_tools_list(&self) -> eyre::Result<ListToolsResult> {
+        Ok(ListToolsResult {
+            tools: self.tools.clone(),
+            next_cursor: None,
+        })
+    }
+    pub async fn handle_tools_call(
+        &self,
+        params: JsonObject,
+        mut metadata: Metadata,
+    ) -> eyre::Result<CallToolResult> {
         let (tx, rx) = oneshot::channel();
-        metadata.insert("__dora_call_id".to_string(), Value::String(gen_call_id()));
-        self.channels.insert(params.call_id.clone(), tx);
+        let call_id = gen_call_id();
+        metadata
+            .parameters
+            .insert("__dora_call_id".to_string(), Parameter::String(call_id));
+        let reply_channels = self
+            .reply_channels
+            .lock()
+            .map_err(|_| eyre::eyre!("Failed to lock reply channels"))?;
+        reply_channels.insert(call_id, tx);
         Ok(rx.await)
     }
 
-    pub async fn handle_request(&self, request: Request, metata: Metadata) -> eyre::Result<Option<Response<Value>>> {
+    pub async fn handle_request(
+        &self,
+        request: Request,
+        metata: Metadata,
+    ) -> eyre::Result<ServerResult> {
         let Request {
             method,
             params,
             extensions,
         } = request;
         match method.as_str() {
-            "ping" => self.handle_ping(),
-            "tools/list" => self.handle_tools_list(),
-            "tools/call" => self.handle_tools_call(params, metata),
-            method => {
-                tracing::error!("unexpected method: {:#?}", method)
-            }
+            "ping" => self
+                .handle_ping()
+                .await
+                .map(|result| ServerResult::EmptyResult(result)),
+            "initialize" => self
+                .handle_initialize()
+                .await
+                .map(|result| ServerResult::InitializeResult(result)),
+            "tools/list" => self
+                .handle_tools_list()
+                .await
+                .map(|result| ServerResult::ListToolsResult(result)),
+            "tools/call" => self
+                .handle_tools_call(params, metata)
+                .await
+                .map(|result| ServerResult::CallToolResult(result)),
+            method => Err(eyre::eyre!("unexpected method: {:#?}", method)),
         }
     }
 
@@ -58,26 +104,19 @@ impl McpServer {
         &self,
         id: DataId,
         data: ArrowData,
-        metadata: &Metadata,
+        metadata: Metadata,
     ) -> eyre::Result<()> {
-        let Some(call_id) = metadata.get("__dora_call_id").and_then(Value::as_str) else {
+        let Some(Parameter::String(call_id)) = metadata.parameters.get("__dora_call_id") else {
             return Ok(());
         };
+        let reply_channels = self
+            .reply_channels
+            .lock()
+            .map_err(|_| eyre::eyre!("Failed to lock reply channels"))?;
         let Some(sender) = reply_channels.remove(call_id) else {
             return Ok(());
         };
-        match event {
-            ServerEvent::Result(result) => result,
-            ServerEvent::CompletionRequest { request, metadata } => {
-                let call_id = metadata.get("call_id").and_then(Value::as_str);
-                if let Some(call_id) = call_id {
-                    // Handle the completion request
-                    tracing::info!("Handling completion request for call ID: {}", call_id);
-                } else {
-                    tracing::warn!("No call ID found in metadata");
-                }
-            }
-        }
+        sender.send(data)?;
         Ok(())
     }
 }
