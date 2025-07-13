@@ -5,6 +5,7 @@ use dora_node_api::arrow::array::{AsArray, StringArray};
 use dora_node_api::{
     dora_core::config::DataId, ArrowData, DoraNode, Metadata, MetadataParameters, Parameter,
 };
+use futures::channel::oneshot;
 use rmcp::model::{
     CallToolResult, EmptyResult, Implementation, InitializeResult, JsonObject, ListToolsResult,
     ProtocolVersion, Request, ServerCapabilities, ServerInfo, ServerResult, Tool,
@@ -12,9 +13,8 @@ use rmcp::model::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
-use futures::channel::oneshot;
 
-use crate::ServerEvent;
+use crate::{Config, ServerEvent};
 
 #[derive(Debug)]
 pub struct McpServer {
@@ -23,8 +23,15 @@ pub struct McpServer {
 }
 
 impl McpServer {
-    pub fn new(tools: Vec<Tool>, server_info: Implementation) -> Self {
-        Self { tools, server_info }
+    pub fn new(config: &Config) -> Self {
+        let mut tools = Vec::new();
+        for tool_config in &config.mcp_tools {
+            tools.push(tool_config.clone());
+        }
+        Self { tools, server_info:Implementation {
+            name: config.name.clone(),
+            version: config.version.clone(),
+        } }
     }
 
     pub fn tools(&self) -> &[Tool] {
@@ -102,7 +109,6 @@ impl McpServer {
             method => Err(eyre::eyre!("unexpected method: {:#?}", method)),
         }
     }
-
 }
 
 pub(crate) fn gen_call_id() -> String {

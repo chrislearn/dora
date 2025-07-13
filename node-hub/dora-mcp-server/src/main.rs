@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use dora_node_api::{
@@ -20,12 +21,15 @@ use mcp_server::McpServer;
 mod error;
 mod routing;
 use error::AppError;
-use std::collections::VecDeque;
+mod config;
+use config::Config;
 
 pub type AppResult<T> = Result<T, crate::AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
+    config::init();
+
     let (mut node, events) = DoraNode::init_from_env()?;
 
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
@@ -33,7 +37,7 @@ async fn main() -> eyre::Result<()> {
 
     let mut reply_channels: HashMap<String, VecDeque<oneshot::Sender<String>>> = HashMap::new();
 
-    let mcp_server = Arc::new(McpServer::new(vec![], Default::default()));
+    let mcp_server = Arc::new(McpServer::new(config::get()));
 
     let acceptor = TcpListener::new("0.0.0.0:8008").bind().await;
     tokio::spawn({

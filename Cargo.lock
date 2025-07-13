@@ -3485,6 +3485,7 @@ dependencies = [
  "chrono",
  "dora-node-api",
  "eyre",
+ "figment",
  "futures",
  "indexmap 2.8.0",
  "mime_guess",

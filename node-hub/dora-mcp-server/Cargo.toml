@@ -26,3 +26,4 @@ tokio-stream = "0.1.11"
 tracing = "0.1.27"
 url = "2.2.2"
 uuid = { version = "1.10", features = ["v4"] }
+figment = { version = "0.10.0", features = ["env", "json", "toml", "yaml"] }
