@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use dora_node_api::arrow::array::{AsArray, StringArray};
@@ -26,12 +27,21 @@ impl McpServer {
     pub fn new(config: &Config) -> Self {
         let mut tools = Vec::new();
         for tool_config in &config.mcp_tools {
-            tools.push(tool_config.clone());
+            let tool = Tool {
+                name: tool_config.name.clone().into(),
+                description: tool_config.description.clone().map(|s| s.into()),
+                input_schema: Arc::new(tool_config.input_schema.schema()),
+                annotations: tool_config.annotations.clone(),
+            };
+            tools.push(tool);
         }
-        Self { tools, server_info:Implementation {
-            name: config.name.clone(),
-            version: config.version.clone(),
-        } }
+        Self {
+            tools,
+            server_info: Implementation {
+                name: config.name.clone(),
+                version: config.version.clone(),
+            },
+        }
     }
 
     pub fn tools(&self) -> &[Tool] {

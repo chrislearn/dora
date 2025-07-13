@@ -1,11 +1,12 @@
+name = "MCP Server Example"
+version = "0.1.0"
 
-
-
-[tools]
-[[counter]]
+[[mcp_tools]]
 name = "Counter"
 args = [" "]
+input_schema = "counter.json"
 
-[[weather]]
-name = "Weather"
-args = [" "]
+# [[mcp_tools]]
+# name = "Weather"
+# args = [" "]
+# input_schema = "counter.json"

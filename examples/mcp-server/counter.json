@@ -1,0 +1,23 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "description": "Input parameters for the counter tool",
+    "properties": {
+        "start_value": {
+            "type": "integer",
+            "description": "The initial value of the counter",
+            "default": 0
+        },
+        "increment": {
+            "type": "integer",
+            "description": "The value to increment by each time",
+            "default": 1
+        },
+        "count_times": {
+            "type": "integer",
+            "description": "The number of times to increment the counter",
+            "default": 10
+        }
+    },
+    "required": ["start_value", "increment", "count_times"]
+}

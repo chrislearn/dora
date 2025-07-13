@@ -6,12 +6,25 @@ use std::{collections::HashMap, path::Path, process::Stdio};
 
 use figment::providers::{Env, Format, Json, Toml, Yaml};
 use figment::Figment;
-use rmcp::model::{ServerInfo, Tool};
+use rmcp::model::{ServerInfo,JsonObject,ToolAnnotations,Tool};
 use rmcp::{service::RunningService, ServiceExt};
 use serde::{Deserialize, Serialize};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
+fn figment_from_path<P: AsRef<Path>>(path: P) -> Figment {
+    let ext = path
+        .as_ref()
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default();
+    match ext {
+        "yaml" | "yml" => Figment::new().merge(Yaml::file(path)),
+        "json" => Figment::new().merge(Json::file(path)),
+        "toml" => Figment::new().merge(Toml::file(path)),
+        _ => panic!("Unsupported config file format: {ext}"),
+    }
+}
 pub fn init() {
     let config_file = Env::var("CONFIG").unwrap_or("config.toml".into());
     let config_path = PathBuf::from(config_file);
@@ -20,21 +33,7 @@ pub fn init() {
         std::process::exit(1);
     }
 
-    let raw_config = match config_path
-        .extension()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or_default()
-    {
-        "yaml" | "yml" => Figment::new().merge(Yaml::file(config_path)),
-        "json" => Figment::new().merge(Json::file(config_path)),
-        "toml" => Figment::new().merge(Toml::file(config_path)),
-        ext => {
-            eprintln!("unsupport config file format: {ext:?}");
-            std::process::exit(1);
-        }
-    };
-
+    let raw_config = figment_from_path(config_path);
     let conf = match raw_config.extract::<Config>() {
         Ok(s) => s,
         Err(e) => {
@@ -66,8 +65,34 @@ fn default_false() -> bool {
     false
 }
 
-pub type McpToolConfig = rmcp::model::Tool; // Assuming Tool is defined in rmcp crate
-                                            // #[derive(Debug, Serialize, Deserialize, Clone)]
-                                            // pub struct McpToolConfig {
-                                            //     pub name: String,
-                                            // }
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct McpToolConfig {
+    /// The name of the tool
+    pub name: String,
+    /// A description of what the tool does
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// A JSON Schema object defining the expected parameters for the tool
+    pub input_schema: InputSchema,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional additional tool information.
+    pub annotations: Option<ToolAnnotations>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum InputSchema {
+    Object(JsonObject),
+    FilePath(String),
+}
+
+impl InputSchema {
+    pub fn schema(&self) -> JsonObject {
+        match self {
+            InputSchema::Object(obj) => obj.clone(),
+            InputSchema::FilePath(path) => figment_from_path(path)
+                .extract::<JsonObject>()
+                .expect("should read input schema from file"),
+        }
+    }
+}
