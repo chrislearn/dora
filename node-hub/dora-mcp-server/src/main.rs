@@ -37,7 +37,7 @@ async fn main() -> eyre::Result<()> {
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
-    let mut reply_channels: HashMap<String, VecDeque<oneshot::Sender<String>>> = HashMap::new();
+    let mut reply_channels: HashMap<String, oneshot::Sender<String>> = HashMap::new();
 
     let mcp_server = Arc::new(McpServer::new(config::get()));
 
@@ -76,7 +76,8 @@ async fn main() -> eyre::Result<()> {
                     reply,
                 } => {
                     let mut metadata = MetadataParameters::default();
-                    metadata.insert("__dora_call_id".into(), Parameter::String(gen_call_id()));
+                    let call_id = gen_call_id();
+                    metadata.insert("__dora_call_id".into(), Parameter::String(call_id.clone()));
                     node.send_output(
                         DataId::from(node_id.clone()),
                         metadata,
@@ -84,7 +85,7 @@ async fn main() -> eyre::Result<()> {
                     )
                     .context("failed to send dora output")?;
 
-                    reply_channels.entry(node_id).or_default().push_back(reply);
+                    reply_channels.insert(call_id, reply);
                 }
             },
             MergedEvent::Dora(event) => match event {
@@ -108,7 +109,6 @@ async fn main() -> eyre::Result<()> {
                             if let Ok(result) =
                                 mcp_server.handle_request(request, &server_events_tx).await
                             {
-                                println!("sssssssssssss");
                                 node.send_output(
                                     DataId::from("response".to_owned()),
                                     metadata.parameters,
@@ -127,8 +127,7 @@ async fn main() -> eyre::Result<()> {
                                 continue;
                             };
                             let reply_channel = reply_channels
-                                .get_mut(call_id)
-                                .and_then(|channels| channels.pop_front())
+                                .remove(call_id)
                                 .context("no reply channel")?;
                             let data = data.as_string::<i32>();
                             let data = data.iter().fold("".to_string(), |mut acc, s| {
@@ -139,7 +138,7 @@ async fn main() -> eyre::Result<()> {
                                 acc
                             });
                             if reply_channel.send(data).is_err() {
-                                tracing::warn!("failed to send chat completion reply because channel closed early");
+                                tracing::warn!("failed to send reply because channel closed early");
                             }
                             // node.send_output(DataId::from("response".to_owned()), metadata, data)
                             //     .context("failed to send dora output")?;
