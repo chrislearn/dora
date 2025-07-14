@@ -1,8 +1,8 @@
-# Dora openai echo example
+# Dora mcp server example
 
-This is a quick example to showcase how use the `dora-openai-server` to receive and send back data.
+This is a quick example to showcase how use the `dora-mcp-server` to receive and send back data.
 
-Dora Openai Server is still experimental and may change in the future.
+Dora MCP Server is still experimental and may change in the future.
 
 Make sure to have, dora, uv and cargo installed.
 
@@ -11,8 +11,11 @@ uv venv -p 3.11 --seed
 uv pip install -e ../../apis/python/node --reinstall
 dora build dataflow.yml --uv
 dora run dataflow.yml --uv
+```
 
-# In a separate terminal
-uv run openai_api_client.py
-dora stop
+
+You can use mpc inspector to test:
+
+```bash
+npx @modelcontextprotocol/inspector
 ```
