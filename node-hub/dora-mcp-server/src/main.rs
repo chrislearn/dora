@@ -11,7 +11,7 @@ use dora_node_api::{
 
 use eyre::{Context, ContextCompat};
 use futures::channel::oneshot;
-use rmcp::model::Request;
+use rmcp::model::JsonRpcRequest;
 use salvo::cors::*;
 use salvo::prelude::*;
 use tokio::sync::mpsc;
@@ -22,7 +22,9 @@ mod error;
 mod routing;
 use error::AppError;
 mod config;
+mod utils;
 use config::Config;
+use utils::gen_call_id;
 
 pub type AppResult<T> = Result<T, crate::AppError>;
 
@@ -74,7 +76,7 @@ async fn main() -> eyre::Result<()> {
                     reply,
                 } => {
                     let mut metadata = MetadataParameters::default();
-                    metadata.insert("__dora_call_id".into(), Parameter::String(node_id.clone()));
+                    metadata.insert("__dora_call_id".into(), Parameter::String(gen_call_id()));
                     node.send_output(
                         DataId::from(node_id.clone()),
                         metadata,
@@ -100,12 +102,13 @@ async fn main() -> eyre::Result<()> {
                                 },
                             );
 
-                            let request = serde_json::from_str::<Request>(&data)
+                            let request = serde_json::from_str::<JsonRpcRequest>(&data)
                                 .context("failed to parse call tool from string")?;
 
                             if let Ok(result) =
                                 mcp_server.handle_request(request, &server_events_tx).await
                             {
+                                println!("sssssssssssss");
                                 node.send_output(
                                     DataId::from("response".to_owned()),
                                     metadata.parameters,

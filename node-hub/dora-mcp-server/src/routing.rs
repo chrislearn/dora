@@ -4,6 +4,7 @@ use dora_node_api::{ArrowData, Metadata};
 use eyre::{Context, ContextCompat};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
+use rmcp::model::{JsonRpcVersion2_0, JsonRpcRequest, JsonRpcResponse};
 use salvo::prelude::*;
 use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
@@ -35,12 +36,16 @@ async fn handle_post(req: &mut Request, depot: &mut Depot, res: &mut Response) -
 
     tracing::info!("Prepare the chat completion request.");
 
-    let rcp_request = serde_json::from_slice::<rmcp::model::Request>(&req.payload().await?)
+    let rpc_request = serde_json::from_slice::<JsonRpcRequest>(&req.payload().await?)
         .context("failed to parse request body")?;
-    let response = mcp_server
-        .handle_request(rcp_request, server_events_tx)
-        .await
-        .unwrap();
+    let response = JsonRpcResponse {
+        jsonrpc: JsonRpcVersion2_0,
+        id: rpc_request.id.clone(),
+        result: mcp_server
+            .handle_request(rpc_request, server_events_tx)
+            .await
+            .unwrap(),
+    };
     res.render(Json(response));
     tracing::info!("Send the chat completion response.");
     Ok(())

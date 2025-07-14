@@ -2,11 +2,19 @@ name = "MCP Server Example"
 version = "0.1.0"
 
 [[mcp_tools]]
-name = "Counter"
-args = [" "]
-input_schema = "counter.json"
+name = "counter decrement"
+args = []
+input_schema = "empty_object.json"
+node_id = "counter"
 
-# [[mcp_tools]]
-# name = "Weather"
-# args = [" "]
-# input_schema = "counter.json"
+[[mcp_tools]]
+name = "counter increment"
+args = []
+input_schema = "empty_object.json"
+node_id = "counter"
+
+[[mcp_tools]]
+name = "counter get value"
+args = []
+input_schema = "empty_object.json"
+node_id = "counter"

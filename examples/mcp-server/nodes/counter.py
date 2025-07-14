@@ -8,4 +8,5 @@ node = Node()
 
 for event in node:
     print("WWWWWcounter event:", event)
-    node.send_output("text", pa.array(["text"]), metadata=event["metadata"])
+    if 'metadata' in event:
+        node.send_output("reply", pa.array(["text"]), metadata=event["metadata"])

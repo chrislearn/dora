@@ -77,6 +77,8 @@ pub struct McpToolConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Optional additional tool information.
     pub annotations: Option<ToolAnnotations>,
+
+    pub node_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

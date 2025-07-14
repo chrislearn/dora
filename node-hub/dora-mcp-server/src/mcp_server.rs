@@ -1,17 +1,12 @@
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 
-use dora_node_api::arrow::array::{AsArray, StringArray};
-use dora_node_api::{
-    dora_core::config::DataId, ArrowData, DoraNode, Metadata, MetadataParameters, Parameter,
-};
 use futures::channel::oneshot;
+use rmcp::model::JsonRpcRequest;
 use rmcp::model::{
     CallToolResult, EmptyResult, Implementation, InitializeResult, JsonObject, ListToolsResult,
-    ProtocolVersion, Request, ServerCapabilities, ServerInfo, ServerResult, Tool,
+    ProtocolVersion, Request, ServerCapabilities, ServerResult, Tool,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -19,8 +14,15 @@ use crate::{Config, ServerEvent};
 
 #[derive(Debug)]
 pub struct McpServer {
-    tools: Vec<Tool>,
+    tools: Vec<McpTool>,
     server_info: Implementation,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct McpTool {
+    pub node_id: String,
+    #[serde(flatten)]
+    pub inner: Tool,
 }
 
 impl McpServer {
@@ -33,7 +35,10 @@ impl McpServer {
                 input_schema: Arc::new(tool_config.input_schema.schema()),
                 annotations: tool_config.annotations.clone(),
             };
-            tools.push(tool);
+            tools.push(McpTool {
+                inner: tool,
+                node_id: tool_config.node_id.clone(),
+            });
         }
         Self {
             tools,
@@ -44,8 +49,8 @@ impl McpServer {
         }
     }
 
-    pub fn tools(&self) -> &[Tool] {
-        &self.tools
+    pub fn tools(&self) -> Vec<&Tool> {
+        self.tools.iter().map(|t| &t.inner).collect()
     }
 
     pub fn server_info(&self) -> &Implementation {
@@ -59,16 +64,20 @@ impl McpServer {
         Ok(InitializeResult {
             protocol_version: ProtocolVersion::V_2025_03_26,
             server_info: self.server_info.clone(),
-            capabilities: ServerCapabilities::default(),
+            capabilities: ServerCapabilities {
+                tools: Some(Default::default()),
+                ..Default::default()
+            },
             instructions: None,
         })
     }
     pub async fn handle_tools_list(&self) -> eyre::Result<ListToolsResult> {
         Ok(ListToolsResult {
-            tools: self.tools.clone(),
+            tools: self.tools.iter().map(|t| t.inner.clone()).collect(),
             next_cursor: None,
         })
     }
+
     pub async fn handle_tools_call(
         &self,
         params: JsonObject,
@@ -76,9 +85,20 @@ impl McpServer {
     ) -> eyre::Result<CallToolResult> {
         let (tx, rx) = oneshot::channel();
 
+        let Some(name) = params.get("name") else {
+            return Err(eyre::eyre!("Tool name is required in parameters"));
+        };
+        let name = name
+            .as_str()
+            .ok_or_else(|| eyre::eyre!("Tool name must be a string"))?;
+        let tool = self
+            .tools
+            .iter()
+            .find(|t| t.inner.name == name)
+            .ok_or_else(|| eyre::eyre!("Tool not found: {}", name))?;
         request_tx
             .send(ServerEvent::CallNode {
-                node_id: "node_id".into(), // TODO
+                node_id: tool.node_id.clone(),
                 data: serde_json::to_string(&params).unwrap(),
                 reply: tx,
             })
@@ -91,14 +111,14 @@ impl McpServer {
 
     pub async fn handle_request(
         &self,
-        request: Request,
+        rpc_request: JsonRpcRequest,
         server_events_tx: &mpsc::Sender<ServerEvent>,
     ) -> eyre::Result<ServerResult> {
         let Request {
             method,
             params,
             extensions,
-        } = request;
+        } = rpc_request.request;
         match method.as_str() {
             "ping" => self
                 .handle_ping()
