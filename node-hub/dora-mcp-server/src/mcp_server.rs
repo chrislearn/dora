@@ -7,7 +7,6 @@ use rmcp::model::{
     ProtocolVersion, Request, ServerCapabilities, ServerResult, Tool,
 };
 use serde::Deserialize;
-use serde_json::Value;
 use tokio::sync::mpsc;
 
 use crate::{Config, ServerEvent};
@@ -49,13 +48,13 @@ impl McpServer {
         }
     }
 
-    pub fn tools(&self) -> Vec<&Tool> {
-        self.tools.iter().map(|t| &t.inner).collect()
-    }
+    // pub fn tools(&self) -> Vec<&Tool> {
+    //     self.tools.iter().map(|t| &t.inner).collect()
+    // }
 
-    pub fn server_info(&self) -> &Implementation {
-        &self.server_info
-    }
+    // pub fn server_info(&self) -> &Implementation {
+    //     &self.server_info
+    // }
 
     pub async fn handle_ping(&self) -> eyre::Result<EmptyResult> {
         Ok(EmptyResult {})
@@ -114,11 +113,7 @@ impl McpServer {
         rpc_request: JsonRpcRequest,
         server_events_tx: &mpsc::Sender<ServerEvent>,
     ) -> eyre::Result<ServerResult> {
-        let Request {
-            method,
-            params,
-            extensions,
-        } = rpc_request.request;
+        let Request { method, params, .. } = rpc_request.request;
         match method.as_str() {
             "ping" => self
                 .handle_ping()
@@ -139,8 +134,4 @@ impl McpServer {
             method => Err(eyre::eyre!("unexpected method: {:#?}", method)),
         }
     }
-}
-
-pub(crate) fn gen_call_id() -> String {
-    format!("call-{}", uuid::Uuid::new_v4())
 }

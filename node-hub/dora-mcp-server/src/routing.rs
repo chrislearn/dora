@@ -1,15 +1,11 @@
 use std::sync::Arc;
 
-use dora_node_api::{ArrowData, Metadata};
-use eyre::{Context, ContextCompat};
-use futures::channel::oneshot;
-use futures::TryStreamExt;
-use rmcp::model::{JsonRpcVersion2_0, JsonRpcRequest, JsonRpcResponse};
+use eyre::Context;
+use rmcp::model::{JsonRpcRequest, JsonRpcResponse, JsonRpcVersion2_0};
 use salvo::prelude::*;
-use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
 
-use crate::{AppError, AppResult, McpServer, ServerEvent};
+use crate::{AppResult, McpServer, ServerEvent};
 
 pub fn root(mcp_server: Arc<McpServer>, server_events_tx: mpsc::Sender<ServerEvent>) -> Router {
     Router::with_hoop(affix_state::inject(mcp_server).inject(server_events_tx)).push(

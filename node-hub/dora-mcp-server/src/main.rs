@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::sync::Arc;
 
 use dora_node_api::{
@@ -39,9 +38,10 @@ async fn main() -> eyre::Result<()> {
 
     let mut reply_channels: HashMap<String, oneshot::Sender<String>> = HashMap::new();
 
-    let mcp_server = Arc::new(McpServer::new(config::get()));
+    let config = config::get();
+    let mcp_server = Arc::new(McpServer::new(config));
 
-    let acceptor = TcpListener::new("0.0.0.0:8008").bind().await;
+    let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn({
         let server_events_tx = server_events_tx.clone();
         let mcp_server = mcp_server.clone();
@@ -126,9 +126,8 @@ async fn main() -> eyre::Result<()> {
                                 tracing::warn!("No call ID found in metadata for id: {}", id);
                                 continue;
                             };
-                            let reply_channel = reply_channels
-                                .remove(call_id)
-                                .context("no reply channel")?;
+                            let reply_channel =
+                                reply_channels.remove(call_id).context("no reply channel")?;
                             let data = data.as_string::<i32>();
                             let data = data.iter().fold("".to_string(), |mut acc, s| {
                                 if let Some(s) = s {

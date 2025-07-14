@@ -1,13 +1,9 @@
-use std::ops::Deref;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::{LazyLock, OnceLock};
-use std::{collections::HashMap, path::Path, process::Stdio};
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use figment::providers::{Env, Format, Json, Toml, Yaml};
 use figment::Figment;
-use rmcp::model::{ServerInfo,JsonObject,ToolAnnotations,Tool};
-use rmcp::{service::RunningService, ServiceExt};
+use rmcp::model::{JsonObject, ToolAnnotations};
 use serde::{Deserialize, Serialize};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -60,9 +56,6 @@ pub struct Config {
 }
 fn default_listen_addr() -> String {
     "0.0.0.0:8008".to_owned()
-}
-fn default_false() -> bool {
-    false
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
