@@ -7,11 +7,19 @@ use tokio::sync::mpsc;
 
 use crate::{AppResult, McpServer, ServerEvent};
 
-pub fn root(mcp_server: Arc<McpServer>, server_events_tx: mpsc::Sender<ServerEvent>) -> Router {
+pub fn root(
+    endpoint: Option<String>,
+    mcp_server: Arc<McpServer>,
+    server_events_tx: mpsc::Sender<ServerEvent>,
+) -> Router {
     Router::with_hoop(affix_state::inject(mcp_server).inject(server_events_tx)).push(
-        Router::with_path("mcp")
-            .post(handle_post)
-            .delete(handle_delete),
+        if let Some(endpoint) = endpoint {
+            Router::with_path(endpoint)
+        } else {
+            Router::new()
+        }
+        .post(handle_post)
+        .delete(handle_delete),
     )
 }
 
@@ -32,7 +40,7 @@ async fn handle_post(req: &mut Request, depot: &mut Depot, res: &mut Response) -
 
     tracing::info!("Prepare the chat completion request.");
 
-    let rpc_request = serde_json::from_slice::<JsonRpcRequest>(&req.payload().await?)
+    let rpc_request = serde_json::from_slice::<JsonRpcRequest>(req.payload().await?)
         .context("failed to parse request body")?;
     let response = JsonRpcResponse {
         jsonrpc: JsonRpcVersion2_0,

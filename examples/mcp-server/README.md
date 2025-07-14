@@ -1,4 +1,4 @@
-# Dora mcp server example
+# Dora MCP Server Example
 
 This is a quick example to showcase how use the `dora-mcp-server` to receive and send back data.
 

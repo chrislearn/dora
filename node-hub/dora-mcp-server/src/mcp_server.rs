@@ -104,8 +104,8 @@ impl McpServer {
             .await?;
 
         let data: String = rx.await?;
-        Ok(serde_json::from_str(&data)
-            .map_err(|e| eyre::eyre!("Failed to parse call tool result: {}", e))?)
+        serde_json::from_str(&data)
+            .map_err(|e| eyre::eyre!("Failed to parse call tool result: {e}"))
     }
 
     pub async fn handle_request(
@@ -115,22 +115,19 @@ impl McpServer {
     ) -> eyre::Result<ServerResult> {
         let Request { method, params, .. } = rpc_request.request;
         match method.as_str() {
-            "ping" => self
-                .handle_ping()
-                .await
-                .map(|result| ServerResult::EmptyResult(result)),
+            "ping" => self.handle_ping().await.map(ServerResult::EmptyResult),
             "initialize" => self
                 .handle_initialize()
                 .await
-                .map(|result| ServerResult::InitializeResult(result)),
+                .map(ServerResult::InitializeResult),
             "tools/list" => self
                 .handle_tools_list()
                 .await
-                .map(|result| ServerResult::ListToolsResult(result)),
+                .map(ServerResult::ListToolsResult),
             "tools/call" => self
                 .handle_tools_call(params, server_events_tx)
                 .await
-                .map(|result| ServerResult::CallToolResult(result)),
+                .map(ServerResult::CallToolResult),
             method => Err(eyre::eyre!("unexpected method: {:#?}", method)),
         }
     }

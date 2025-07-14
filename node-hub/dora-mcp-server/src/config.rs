@@ -49,6 +49,9 @@ pub struct Config {
     #[serde(default = "default_listen_addr")]
     pub listen_addr: String,
 
+    #[serde(default = "default_endpoint")]
+    pub endpoint: Option<String>,
+
     pub name: String,
     pub version: String,
 
@@ -56,6 +59,9 @@ pub struct Config {
 }
 fn default_listen_addr() -> String {
     "0.0.0.0:8008".to_owned()
+}
+fn default_endpoint() -> Option<String> {
+    Some("mcp".to_owned())
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

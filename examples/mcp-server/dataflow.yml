@@ -4,10 +4,8 @@ nodes:
     path: ../../target/release/dora-mcp-server
     outputs:
       - counter
-      - weather
     inputs:
       counter_reply: counter/reply
-      # weather_reply: weather/reply
     env:
       MCP_SERVER_CONFIG: config.toml
 
@@ -17,10 +15,3 @@ nodes:
       text: mcp-server/counter
     outputs:
       - reply
-
-  # - id: weather
-  #   path: nodes/weather.py
-  #   inputs:
-  #     text: dora-mcp-server/weather
-  #   outputs:
-  #     - reply
