@@ -25,7 +25,7 @@ mod utils;
 use config::Config;
 use utils::gen_call_id;
 
-pub type AppResult<T> = Result<T, crate::AppError>;
+pub type AppResult<T> = Result<T, AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {

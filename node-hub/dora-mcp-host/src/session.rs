@@ -7,7 +7,7 @@ use serde_json;
 
 use crate::client::ChatClient;
 use crate::{
-    models::{ChatCompletionMessage, CompletionResponse, CompletionRequest, ToolFunction},
+    models::{ChatCompletionMessage, ChatCompletionResponse, ChatCompletionRequest, ToolFunction},
     tool::{Tool as ToolTrait, ToolSet},
 };
 
@@ -118,7 +118,7 @@ impl ChatSession {
             }
         }
     }
-    pub async fn chat(& self, mut request: CompletionRequest) -> Result<CompletionResponse> {
+    pub async fn chat(& self, mut request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         // self.messages.push(ChatCompletionMessage::user(&input));
 
         let tools = self.tool_set.tools();

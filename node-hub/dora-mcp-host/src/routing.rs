@@ -48,7 +48,7 @@ async fn chat_completions(
 
     tracing::info!("Prepare the chat completion request.");
 
-    let mut chat_request = req.parse_json::<CompletionRequest>().await?;
+    let mut chat_request = req.parse_json::<ChatCompletionRequest>().await?;
 
     // check if the user id is provided
     if chat_request.user.is_none() {

@@ -1,10 +1,10 @@
-use std::collections::VecDeque;
+use std::collections::HashMap;
 
 use dora_node_api::{
     arrow::array::{AsArray, StringArray},
     dora_core::config::DataId,
     merged::{MergeExternalSend, MergedEvent},
-    DoraNode, Event,
+    DoraNode, Event, MetadataParameters, Parameter,
 };
 use eyre::{Context, ContextCompat};
 
@@ -25,8 +25,9 @@ mod session;
 use session::ChatSession;
 mod tool;
 use tool::{get_mcp_tools, ToolSet};
+use utils::gen_call_id;
 
-pub type AppResult<T> = Result<T, crate::AppError>;
+pub type AppResult<T> = Result<T, AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -35,22 +36,25 @@ async fn main() -> eyre::Result<()> {
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
-    let chat_session = config::get()
+    let config = config::get();
+    let chat_session = config
         .create_session()
         .await
         .context("failed to create chat session")?;
 
-    let mut reply_channels = VecDeque::new();
+    let mut reply_channels: HashMap<String, oneshot::Sender<ChatCompletionResponse>> =
+        HashMap::new();
 
-    let acceptor = TcpListener::new("0.0.0.0:8008").bind().await;
+    let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn(async move {
-        let service = Service::new(routing::root(server_events_tx.clone(), chat_session.into())).hoop(
-            Cors::new()
-                .allow_origin(AllowOrigin::any())
-                .allow_methods(AllowMethods::any())
-                .allow_headers(AllowHeaders::any())
-                .into_handler(),
-        );
+        let service = Service::new(routing::root(server_events_tx.clone(), chat_session.into()))
+            .hoop(
+                Cors::new()
+                    .allow_origin(AllowOrigin::any())
+                    .allow_methods(AllowMethods::any())
+                    .allow_headers(AllowHeaders::any())
+                    .into_handler(),
+            );
         Server::new(acceptor).serve(service).await;
         if let Err(err) = server_events_tx.send(ServerEvent::Result(Ok(()))).await {
             tracing::warn!("server result channel closed: {err}");
@@ -71,30 +75,39 @@ async fn main() -> eyre::Result<()> {
                     server_result.context("server failed")?;
                     break;
                 }
-                ServerEvent::CompletionRequest { request, reply } => {
+                ServerEvent::CallNode {
+                    node_id,
+                    request,
+                    reply,
+                } => {
+                    let mut metadata = MetadataParameters::default();
+                    let call_id = gen_call_id();
+                    metadata.insert("__dora_call_id".into(), Parameter::String(call_id.clone()));
                     let texts = request.to_texts();
-                    node.send_output(
-                        output_id.clone(),
-                        Default::default(),
-                        StringArray::from(texts),
-                    )
-                    .context("failed to send dora output")?;
+                    node.send_output(output_id, Default::default(), StringArray::from(texts))
+                        .context("failed to send dora output")?;
 
-                    reply_channels.push_back((reply, 0 as u64, request.model));
+                    reply_channels.insert(call_id, reply);
                 }
             },
             MergedEvent::Dora(event) => match event {
                 Event::Input {
-                    id, 
+                    id,
                     data,
-                    metadata: _,
+                    metadata,
                 } => {
                     match id.as_str() {
                         "text" => {
-                            let (reply_channel, prompt_tokens, model) =
-                                reply_channels.pop_front().context("no reply channel")?;
+                            let Some(Parameter::String(call_id)) =
+                                metadata.parameters.get("__dora_call_id")
+                            else {
+                                tracing::warn!("No call ID found in metadata for id: {}", id);
+                                continue;
+                            };
+                            let reply_channel =
+                                reply_channels.remove(call_id).context("no reply channel")?;
                             let data = data.as_string::<i32>();
-                            let string = data.iter().fold("".to_string(), |mut acc, s| {
+                            let data = data.iter().fold("".to_string(), |mut acc, s| {
                                 if let Some(s) = s {
                                     acc.push('\n');
                                     acc.push_str(s);
@@ -102,26 +115,25 @@ async fn main() -> eyre::Result<()> {
                                 acc
                             });
 
-                            let data = ChatCompletionObject {
+                            let data = ChatCompletionResponse {
                                 id: format!("completion-{}", uuid::Uuid::new_v4()),
                                 object: "chat.completion".to_string(),
                                 created: chrono::Utc::now().timestamp() as u64,
-                                model: model.unwrap_or_default(),
-                                choices: vec![ChatCompletionObjectChoice {
+                                model: "".into(), // TODO
+                                choices: vec![ChatCompletionResponseChoice {
                                     index: 0,
-                                    message: ChatCompletionObjectMessage {
-                                        role: ChatCompletionRole::Assistant,
-                                        content: Some(string.to_string()),
+                                    message: ChatCompletionMessage {
+                                        role: ChatCompletionRole::Assistant.to_string(),
+                                        content: data.to_string().into(),
                                         tool_calls: Vec::new(),
-                                        function_call: None,
                                     },
                                     finish_reason: FinishReason::stop,
                                     logprobs: None,
                                 }],
                                 usage: Usage {
                                     prompt_tokens,
-                                    completion_tokens: string.len() as u64,
-                                    total_tokens: prompt_tokens + string.len() as u64,
+                                    completion_tokens: data.len() as u64,
+                                    total_tokens: prompt_tokens + data.len() as u64,
                                 },
                             };
 
@@ -150,8 +162,9 @@ async fn main() -> eyre::Result<()> {
 
 enum ServerEvent {
     Result(eyre::Result<()>),
-    CompletionRequest {
-        request: CompletionRequest,
-        reply: oneshot::Sender<ChatCompletionObject>,
+    CallNode {
+        node_id: String,
+        request: ChatCompletionRequest,
+        reply: oneshot::Sender<ChatCompletionResponse>,
     },
 }

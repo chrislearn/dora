@@ -1,15 +1,18 @@
-use crate::models::{CompletionRequest, CompletionResponse};
+use tokio::sync::mpsc;
+
 use eyre::eyre;
 use eyre::Result;
+use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
 use crate::config::{DeepseekConfig, GeminiConfig};
-use crate::DataId;
+use crate::models::{ChatCompletionResponse, ChatCompletionRequest};
+use crate::{DataId, ServerEvent};
 
 #[async_trait]
 pub trait ChatClient: Send + Sync {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse>;
+    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse>;
 }
 
 #[derive(Debug)]
@@ -40,7 +43,7 @@ impl GeminiClient {
 
 #[async_trait]
 impl ChatClient for GeminiClient {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
+    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         let response = self
             .client
             .post(&self.api_url)
@@ -57,7 +60,7 @@ impl ChatClient for GeminiClient {
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
-        let completion: CompletionResponse = serde_json::from_str(&text_data)
+        let completion: ChatCompletionResponse = serde_json::from_str(&text_data)
             .map_err(eyre::Report::from)
             .unwrap();
         Ok(completion)
@@ -92,8 +95,7 @@ impl DeepseekClient {
 
 #[async_trait]
 impl ChatClient for DeepseekClient {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
-        println!("================={:#?}", self);
+    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         let response = self
             .client
             .post(&format!("{}/chat/completions", self.api_url))
@@ -110,7 +112,7 @@ impl ChatClient for DeepseekClient {
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
-        let completion: CompletionResponse = serde_json::from_str(&text_data)
+        let completion: ChatCompletionResponse = serde_json::from_str(&text_data)
             .map_err(eyre::Report::from)
             .unwrap();
         Ok(completion)
@@ -119,24 +121,30 @@ impl ChatClient for DeepseekClient {
 
 #[derive(Debug)]
 pub struct EventClient {
-    node_id: DataId,
+    node_id: String,
+    event_sender: mpsc::Sender<ServerEvent>,
 }
 
 impl EventClient {
-    pub fn new(node_id: DataId) -> Self {
-        Self { node_id }
+    pub fn new(node_id: String, event_sender: mpsc::Sender<ServerEvent>) -> Self {
+        Self {
+            node_id,
+            event_sender,
+        }
     }
 }
 
 #[async_trait]
 impl ChatClient for EventClient {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse> {
-        unimplemented!("EventClient does not support completion requests yet");
-        // let text_data = response.text().await?;
-        // println!("Received response: {}", text_data);
-        // let completion: CompletionResponse = serde_json::from_str(&text_data)
-        //     .map_err(eyre::Error::from)
-        //     .unwrap();
-        // Ok(completion)
+    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+        let (tx, rx) = oneshot::channel();
+        self.event_sender
+            .send(ServerEvent::CallNode {
+                node_id: self.node_id.clone(),
+                request,
+                reply: tx,
+            })
+            .await?;
+       rx.await.map_err(|e| eyre::eyre!("Failed to parse call tool result: {e}"))
     }
 }
