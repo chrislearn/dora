@@ -1,17 +1,12 @@
 use std::sync::Arc;
 
-use rust_embed::RustEmbed;
 use salvo::prelude::*;
-use salvo::serve_static::static_embed;
 use tokio::sync::mpsc;
 
 use crate::models::*;
 use crate::session::ChatSession;
 use crate::{AppResult, ServerEvent};
 
-#[derive(RustEmbed)]
-#[folder = "static"]
-struct Assets;
 
 pub fn root(server_events_tx: mpsc::Sender<ServerEvent>, chat_session: Arc<ChatSession>) -> Router {
     Router::with_hoop(affix_state::inject(server_events_tx).inject(chat_session))
@@ -25,12 +20,16 @@ pub fn root(server_events_tx: mpsc::Sender<ServerEvent>, chat_session: Arc<ChatS
                 .push(Router::with_path("info").get(todo))
                 .push(Router::with_path("realtime").get(todo)),
         )
-        .push(Router::with_path("{**path}").get(static_embed::<Assets>().defaults("index.html")))
+        .push(Router::with_path("{**path}").get(index))
 }
 
 #[handler]
 async fn todo(res: &mut Response) {
     res.render(Text::Plain("TODO"));
+}
+#[handler]
+async fn index(res: &mut Response) {
+    res.render(Text::Plain("Hello"));
 }
 
 #[handler]

@@ -10,22 +10,21 @@ repository.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.46.1", features = ["full"] }
-dora-node-api = { workspace = true, features = ["tracing"] }
 chrono = "0.4.31"
+dora-node-api = { workspace = true, features = ["tracing"] }
 eyre = "0.6.8"
-tracing = "0.1.27"
+figment = { version = "0.10.0", features = ["env", "json", "toml", "yaml"] }
+futures = "0.3.31"
+indexmap = { version = "2.6.0", features = ["serde"] }
+mime_guess = "2.0.4"
+reqwest = { version = "0.12.22" }
+rmcp = { version = "0.2.1", features = ["client", "transport-child-process", "transport-sse-client", "transport-streamable-http-client", "reqwest"] }
+salvo = { version = "0.80.0", default-features = false, features = ["affix-state", "cors", "server", "http1", "http2"] }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
-url = "2.2.2"
-indexmap = { version = "2.6.0", features = ["serde"] }
 thiserror = "2.0.12"
-uuid = { version = "1.10", features = ["v4"] }
-mime_guess = "2.0.4"
-futures = "0.3.31"
+tokio = { version = "1.46.1", features = ["full"] }
 tokio-stream = "0.1.11"
-salvo = { version = "0.80.0", default-features = false, features = ["affix-state", "cors", "serve-static", "server", "http1", "http2"] }
-rust-embed = { workspace = true }
-rmcp = { version = "0.2.1", features = ["client", "transport-child-process", "transport-sse-client", "transport-streamable-http-client", "reqwest"] }
-figment = { version = "0.10.0", features = ["env", "json", "toml", "yaml"] }
-reqwest = { version = "0.12.22" }
+tracing = "0.1.27"
+url = "2.2.2"
+uuid = { version = "1.10", features = ["v4"] }
