@@ -6,9 +6,9 @@ api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-fl
 api_key = "sk-4e77fa0ceae14dc2af3303c9ef6233c6"
 api_url = "https://api.deepseek.com"
 
+[]
 
-# [mcp]
-# [[mcp.server]]
+# [[mcp_servers]]
 # name = "MCP server name"
 # protocol = "stdio"
 # command = "MCP server path"
