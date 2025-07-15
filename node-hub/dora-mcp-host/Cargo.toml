@@ -24,7 +24,7 @@ uuid = { version = "1.10", features = ["v4"] }
 mime_guess = "2.0.4"
 futures = "0.3.31"
 tokio-stream = "0.1.11"
-salvo = { version = "0.80.0", default_features = false, features = ["affix-state", "cors", "serve-static", "server", "http1", "http2"] }
+salvo = { version = "0.80.0", default-features = false, features = ["affix-state", "cors", "serve-static", "server", "http1", "http2"] }
 rust-embed = { workspace = true }
 rmcp = { version = "0.2.1", features = ["client", "transport-child-process", "transport-sse-client", "transport-streamable-http-client", "reqwest"] }
 figment = { version = "0.10.0", features = ["env", "json", "toml", "yaml"] }
