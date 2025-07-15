@@ -1,16 +1,16 @@
-use std::ops::Deref;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::{LazyLock, OnceLock};
-use std::{collections::HashMap, path::Path, process::Stdio};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    process::Stdio,
+    sync::{Arc, OnceLock},
+};
 
 use figment::providers::{Env, Format, Json, Toml, Yaml};
 use figment::Figment;
-use rmcp::model::{ServerInfo, Tool};
 use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
 use serde::{Deserialize, Serialize};
 
-use crate::client::{DeepseekClient, GeminiClient};
+use crate::client::DeepseekClient;
 use crate::{ChatSession, ToolSet};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -196,7 +196,7 @@ impl Config {
         //     tool_set,
         //     Some("gpt-4o-mini".to_string()),
         // ))
-        
+
         let deepseek_config = self.deepseek.as_ref().ok_or_else(|| {
             eyre::eyre!("deepseek configuration is missing. Please check your config file.")
         })?;

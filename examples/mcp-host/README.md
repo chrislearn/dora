@@ -1,4 +1,4 @@
-# Dora openai echo example
+# Dora Openai MCP Host Example
 
 This is a quick example to showcase how use the `dora-openai-server` to receive and send back data.
 

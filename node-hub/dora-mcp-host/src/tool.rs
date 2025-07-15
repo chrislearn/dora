@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use eyre::{Report, Result};
+use eyre::Result;
 use rmcp::{
     model::{CallToolRequestParam, CallToolResult, Tool as McpTool},
     service::ServerSink,

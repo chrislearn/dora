@@ -24,7 +24,7 @@ mod config;
 mod session;
 use session::ChatSession;
 mod tool;
-use tool::{get_mcp_tools, Tool, ToolSet};
+use tool::{get_mcp_tools, ToolSet};
 
 pub type AppResult<T> = Result<T, crate::AppError>;
 

@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use eyre::{Context, ContextCompat};
-use futures::channel::oneshot;
-use futures::TryStreamExt;
 use rust_embed::RustEmbed;
 use salvo::prelude::*;
 use salvo::serve_static::static_embed;
@@ -10,7 +7,7 @@ use tokio::sync::mpsc;
 
 use crate::models::*;
 use crate::session::ChatSession;
-use crate::{AppError, AppResult, ServerEvent};
+use crate::{AppResult, ServerEvent};
 
 #[derive(RustEmbed)]
 #[folder = "static"]

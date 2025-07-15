@@ -1,9 +1,8 @@
 use std::{
-    io::{self, Write},
     sync::Arc,
 };
 
-use eyre::{Report, Result};
+use eyre::{Result};
 use serde_json;
 
 use crate::client::ChatClient;
