@@ -50,7 +50,7 @@ async fn main() -> eyre::Result<()> {
     let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn(async move {
         let service = Service::new(routing::root(
-                config.endpoint.clone(),server_events_tx.clone(), chat_session.into()))
+                config.endpoint.clone(), chat_session.into()))
             .hoop(
                 Cors::new()
                     .allow_origin(AllowOrigin::any())

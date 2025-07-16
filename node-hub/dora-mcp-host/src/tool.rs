@@ -4,12 +4,9 @@ use eyre::Result;
 use rmcp::{
     model::{CallToolRequestParam, CallToolResult, Tool as McpTool},
     service::ServerSink,
-    Error as McpError,
 };
 use salvo::async_trait;
 use serde_json::Value;
-
-use crate::models::{Content, ToolResult};
 
 #[async_trait]
 pub trait Tool: Send + Sync {
@@ -90,38 +87,4 @@ pub async fn get_mcp_tools(server: ServerSink) -> Result<Vec<McpToolAdapter>> {
         .into_iter()
         .map(|tool| McpToolAdapter::new(tool, server.clone()))
         .collect())
-}
-
-pub trait IntoCallToolResult {
-    fn into_call_tool_result(self) -> Result<ToolResult, McpError>;
-}
-
-impl<T> IntoCallToolResult for Result<T, McpError>
-where
-    T: serde::Serialize,
-{
-    fn into_call_tool_result(self) -> Result<ToolResult, McpError> {
-        match self {
-            Ok(response) => {
-                let content = Content {
-                    content_type: "application/json".to_string(),
-                    body: serde_json::to_string(&response).unwrap_or_default(),
-                };
-                Ok(ToolResult {
-                    success: true,
-                    contents: vec![content],
-                })
-            }
-            Err(error) => {
-                let content = Content {
-                    content_type: "application/json".to_string(),
-                    body: serde_json::to_string(&error).unwrap_or_default(),
-                };
-                Ok(ToolResult {
-                    success: false,
-                    contents: vec![content],
-                })
-            }
-        }
-    }
 }

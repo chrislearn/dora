@@ -1,18 +1,13 @@
 use std::sync::Arc;
 
 use salvo::prelude::*;
-use tokio::sync::mpsc;
 
 use crate::models::*;
 use crate::session::ChatSession;
-use crate::{AppResult, ServerEvent};
+use crate::AppResult;
 
-pub fn root(
-    endpoint: Option<String>,
-    server_events_tx: mpsc::Sender<ServerEvent>,
-    chat_session: Arc<ChatSession>,
-) -> Router {
-    Router::with_hoop(affix_state::inject(server_events_tx).inject(chat_session))
+pub fn root(endpoint: Option<String>, chat_session: Arc<ChatSession>) -> Router {
+    Router::with_hoop(affix_state::inject(chat_session))
         .push(
             if let Some(endpoint) = endpoint {
                 Router::with_path(endpoint)
@@ -46,19 +41,19 @@ async fn chat_completions(
     res: &mut Response,
 ) -> AppResult<()> {
     tracing::info!("Handling the coming chat completion request.");
-    let request_tx = depot
-        .obtain::<mpsc::Sender<ServerEvent>>()
-        .expect("request_tx must be exists");
     let chat_session = depot
         .obtain::<Arc<ChatSession>>()
         .expect("chat session must be exists");
 
     tracing::info!("Prepare the chat completion request.");
 
-    let mut chat_request = match  req.parse_json::<ChatCompletionRequest>().await{
+    let mut chat_request = match req.parse_json::<ChatCompletionRequest>().await {
         Ok(chat_requst) => chat_requst,
         Err(e) => {
-            println!("parse request error: {e}, payload: {}", String::from_utf8_lossy(req.payload().await?));
+            println!(
+                "parse request error: {e}, payload: {}",
+                String::from_utf8_lossy(req.payload().await?)
+            );
             return Err(e.into());
         }
     };

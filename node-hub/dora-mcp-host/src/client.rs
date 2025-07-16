@@ -6,10 +6,9 @@ use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
-use crate::config::DoraConfig;
-use crate::config::{DeepseekConfig, GeminiConfig};
-use crate::models::{ChatCompletionResponse, ChatCompletionRequest};
-use crate::{DataId, ServerEvent};
+use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig};
+use crate::models::{ChatCompletionRequest, ChatCompletionResponse};
+use crate::ServerEvent;
 
 #[async_trait]
 pub trait ChatClient: Send + Sync {
@@ -56,7 +55,6 @@ impl ChatClient for GeminiClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            println!("API error: {}", error_text);
             return Err(eyre!("API Error: {}", error_text));
         }
         let text_data = response.text().await?;
@@ -108,13 +106,12 @@ impl ChatClient for DeepseekClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            println!("API error: {}  request: {:#?}", error_text, request);
             return Err(eyre!("API Error: {}", error_text));
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
-        let completion: ChatCompletionResponse = serde_json::from_str(&text_data)
-            .map_err(eyre::Report::from)?;
+        let completion: ChatCompletionResponse =
+            serde_json::from_str(&text_data).map_err(eyre::Report::from)?;
         Ok(completion)
     }
 }
@@ -145,6 +142,7 @@ impl ChatClient for DoraClient {
                 reply: tx,
             })
             .await?;
-       rx.await.map_err(|e| eyre::eyre!("Failed to parse call tool result: {e}"))
+        rx.await
+            .map_err(|e| eyre::eyre!("Failed to parse call tool result: {e}"))
     }
 }
