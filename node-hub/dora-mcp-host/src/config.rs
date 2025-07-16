@@ -4,14 +4,15 @@ use std::{
     process::Stdio,
     sync::{Arc, OnceLock},
 };
+use tokio::sync::mpsc;
 
 use figment::providers::{Env, Format, Json, Toml, Yaml};
 use figment::Figment;
 use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
 use serde::{Deserialize, Serialize};
 
-use crate::client::DeepseekClient;
-use crate::{ChatSession, ToolSet};
+use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient};
+use crate::{ChatSession, ServerEvent, ToolSet};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
@@ -57,8 +58,10 @@ pub struct Config {
     #[serde(default = "default_listen_addr")]
     pub listen_addr: String,
 
-    pub gemini: Option<GeminiConfig>,
-    pub deepseek: Option<DeepseekConfig>,
+    #[serde(default = "default_endpoint")]
+    pub endpoint: Option<String>,
+
+    pub model_service: Option<ModelServiceConfig>,
 
     pub mcp: Option<McpConfig>,
     #[serde(default = "default_false")]
@@ -67,12 +70,24 @@ pub struct Config {
 fn default_listen_addr() -> String {
     "0.0.0.0:8008".to_owned()
 }
+fn default_endpoint() -> Option<String> {
+    Some("v1".to_owned())
+}
+
 fn default_false() -> bool {
     false
 }
 fn default_gemini_api_url() -> String {
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         .to_owned()
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "provider", rename_all = "snake_case")]
+pub enum ModelServiceConfig {
+    Gemini(GeminiConfig),
+    Deepseek(DeepseekConfig),
+    Dora(DoraConfig),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -91,6 +106,11 @@ pub struct DeepseekConfig {
     pub api_url: String,
     #[serde(default = "default_false")]
     pub proxy: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DoraConfig {
+    pub output: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -170,7 +190,22 @@ impl Config {
         Ok(clients)
     }
 
-    pub async fn create_session(&self) -> eyre::Result<ChatSession> {
+    fn create_client(&self, server_events_tx: mpsc::Sender<ServerEvent>) -> Arc<dyn ChatClient> {
+        match &self.model_service {
+            Some(ModelServiceConfig::Gemini(config)) => Arc::new(GeminiClient::new(config)),
+            Some(ModelServiceConfig::Deepseek(config)) => Arc::new(DeepseekClient::new(config)),
+            Some(ModelServiceConfig::Dora(config)) => Arc::new(DoraClient::new(config, server_events_tx)),
+            None => {
+                eprintln!("No model service configured. Please check your config file.");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    pub async fn create_session(
+        &self,
+        server_events_tx: mpsc::Sender<ServerEvent>,
+    ) -> eyre::Result<ChatSession> {
         let mut tool_set = ToolSet::default();
 
         if self.mcp.is_some() {
@@ -187,22 +222,8 @@ impl Config {
             }
         }
 
-        // let gemini_config = self.gemini.as_ref().ok_or_else(|| {
-        //     eyre::eyre!("Gemini configuration is missing. Please check your config file.")
-        // })?;
-        // let gemini_client = Arc::new(GeminiClient::new(gemini_config));
-        // Ok(ChatSession::new(
-        //     gemini_client,
-        //     tool_set,
-        //     Some("gpt-4o-mini".to_string()),
-        // ))
-
-        let deepseek_config = self.deepseek.as_ref().ok_or_else(|| {
-            eyre::eyre!("deepseek configuration is missing. Please check your config file.")
-        })?;
-        let deepseek_client = Arc::new(DeepseekClient::new(deepseek_config));
         Ok(ChatSession::new(
-            deepseek_client,
+            self.create_client(server_events_tx).into(),
             tool_set,
             Some("deepseek-chat".to_string()),
         ))

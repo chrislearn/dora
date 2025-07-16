@@ -1,11 +1,7 @@
 """TODO: Add docstring."""
-
 from openai import OpenAI
 
-client = OpenAI(base_url="http://127.0.0.1:8008/v1", api_key="dummy_api_key", default_headers={
-        "no_proxy": "*" 
-    })
-
+client = OpenAI(base_url="http://127.0.0.1:8118/v1", api_key="dummy_api_key")
 
 def test_list_models():
     """TODO: Add docstring."""

@@ -38,16 +38,19 @@ async fn main() -> eyre::Result<()> {
 
     let config = config::get();
     let chat_session = config
-        .create_session()
+        .create_session(server_events_tx.clone())
         .await
         .context("failed to create chat session")?;
 
-    let mut reply_channels: HashMap<String, (oneshot::Sender<ChatCompletionResponse>, u64, Option<String>)> =
-        HashMap::new();
+    let mut reply_channels: HashMap<
+        String,
+        (oneshot::Sender<ChatCompletionResponse>, u64, Option<String>),
+    > = HashMap::new();
 
     let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn(async move {
-        let service = Service::new(routing::root(server_events_tx.clone(), chat_session.into()))
+        let service = Service::new(routing::root(
+                config.endpoint.clone(),server_events_tx.clone(), chat_session.into()))
             .hoop(
                 Cors::new()
                     .allow_origin(AllowOrigin::any())
@@ -66,8 +69,6 @@ async fn main() -> eyre::Result<()> {
     let merged = events.merge_external_send(server_events);
     let events = futures::executor::block_on_stream(merged);
 
-    let output_id = DataId::from("text".to_owned());
-
     for event in events {
         match event {
             MergedEvent::External(event) => match event {
@@ -76,7 +77,7 @@ async fn main() -> eyre::Result<()> {
                     break;
                 }
                 ServerEvent::CallNode {
-                    node_id,
+                    output,
                     request,
                     reply,
                 } => {
@@ -84,65 +85,58 @@ async fn main() -> eyre::Result<()> {
                     let call_id = gen_call_id();
                     metadata.insert("__dora_call_id".into(), Parameter::String(call_id.clone()));
                     let texts = request.to_texts();
-                    node.send_output(output_id.clone(), Default::default(), StringArray::from(texts))
+                    node.send_output(DataId::from(output), Default::default(), StringArray::from(texts))
                         .context("failed to send dora output")?;
 
                     reply_channels.insert(call_id, (reply, 0_u64, request.model));
                 }
             },
             MergedEvent::Dora(event) => match event {
-                Event::Input {
-                    id,
-                    data,
-                    metadata,
-                } => {
-                    match id.as_str() {
-                        "text" => {
-                            let Some(Parameter::String(call_id)) =
-                                metadata.parameters.get("__dora_call_id")
-                            else {
-                                tracing::warn!("No call ID found in metadata for id: {}", id);
-                                continue;
-                            };
-                            let (reply_channel, prompt_tokens, model) =
-                                reply_channels.remove(call_id).context("no reply channel")?;
-                            let data = data.as_string::<i32>();
-                            let data = data.iter().fold("".to_string(), |mut acc, s| {
-                                if let Some(s) = s {
-                                    acc.push('\n');
-                                    acc.push_str(s);
-                                }
-                                acc
-                            });
-
-                            let data = ChatCompletionResponse {
-                                id: format!("completion-{}", uuid::Uuid::new_v4()),
-                                object: "chat.completion".to_string(),
-                                created: chrono::Utc::now().timestamp() as u64,
-                                model: model.unwrap_or_default(),
-                                usage: Usage {
-                                    prompt_tokens,
-                                    completion_tokens: data.len() as u64,
-                                    total_tokens: prompt_tokens + data.len() as u64,
-                                },
-                                choices: vec![ChatCompletionResponseChoice {
-                                    index: 0,
-                                    message: ChatCompletionMessage {
-                                        role: ChatCompletionRole::Assistant.to_string(),
-                                        content: ChatCompletionContent::new_text(data),
-                                        tool_calls: None,
-                                    },
-                                    finish_reason: FinishReason::stop,
-                                    logprobs: None,
-                                }],
-                            };
-
-                            if reply_channel.send(data).is_err() {
-                                tracing::warn!("failed to send chat completion reply because channel closed early");
-                            }
-                        }
-                        _ => eyre::bail!("unexpected input id: {}", id),
+                Event::Input { id, data, metadata } => {
+                    let Some(Parameter::String(call_id)) =
+                        metadata.parameters.get("__dora_call_id")
+                    else {
+                        tracing::warn!("No call ID found in metadata for id: {}", id);
+                        continue;
                     };
+                    let (reply_channel, prompt_tokens, model) =
+                        reply_channels.remove(call_id).context("no reply channel")?;
+                    let data = data.as_string::<i32>();
+                    let data = data.iter().fold("".to_string(), |mut acc, s| {
+                        if let Some(s) = s {
+                            acc.push('\n');
+                            acc.push_str(s);
+                        }
+                        acc
+                    });
+
+                    let data = ChatCompletionResponse {
+                        id: format!("completion-{}", uuid::Uuid::new_v4()),
+                        object: "chat.completion".to_string(),
+                        created: chrono::Utc::now().timestamp() as u64,
+                        model: model.unwrap_or_default(),
+                        usage: Usage {
+                            prompt_tokens,
+                            completion_tokens: data.len() as u64,
+                            total_tokens: prompt_tokens + data.len() as u64,
+                        },
+                        choices: vec![ChatCompletionResponseChoice {
+                            index: 0,
+                            message: ChatCompletionMessage {
+                                role: ChatCompletionRole::Assistant.to_string(),
+                                content: ChatCompletionContent::new_text(data),
+                                tool_calls: None,
+                            },
+                            finish_reason: FinishReason::stop,
+                            logprobs: None,
+                        }],
+                    };
+
+                    if reply_channel.send(data).is_err() {
+                        tracing::warn!(
+                            "failed to send chat completion reply because channel closed early"
+                        );
+                    }
                 }
                 Event::Stop(_) => {
                     break;
@@ -163,7 +157,7 @@ async fn main() -> eyre::Result<()> {
 enum ServerEvent {
     Result(eyre::Result<()>),
     CallNode {
-        node_id: String,
+        output: String,
         request: ChatCompletionRequest,
         reply: oneshot::Sender<ChatCompletionResponse>,
     },

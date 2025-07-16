@@ -6,6 +6,7 @@ use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
+use crate::config::DoraConfig;
 use crate::config::{DeepseekConfig, GeminiConfig};
 use crate::models::{ChatCompletionResponse, ChatCompletionRequest};
 use crate::{DataId, ServerEvent};
@@ -120,27 +121,27 @@ impl ChatClient for DeepseekClient {
 }
 
 #[derive(Debug)]
-pub struct EventClient {
-    node_id: String,
+pub struct DoraClient {
+    output: String,
     event_sender: mpsc::Sender<ServerEvent>,
 }
 
-impl EventClient {
-    pub fn new(node_id: String, event_sender: mpsc::Sender<ServerEvent>) -> Self {
+impl DoraClient {
+    pub fn new(config: &DoraConfig, event_sender: mpsc::Sender<ServerEvent>) -> Self {
         Self {
-            node_id,
+            output: config.output.clone(),
             event_sender,
         }
     }
 }
 
 #[async_trait]
-impl ChatClient for EventClient {
+impl ChatClient for DoraClient {
     async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         let (tx, rx) = oneshot::channel();
         self.event_sender
             .send(ServerEvent::CallNode {
-                node_id: self.node_id.clone(),
+                output: self.output.clone(),
                 request,
                 reply: tx,
             })

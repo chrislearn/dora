@@ -7,18 +7,25 @@ use crate::models::*;
 use crate::session::ChatSession;
 use crate::{AppResult, ServerEvent};
 
-
-pub fn root(server_events_tx: mpsc::Sender<ServerEvent>, chat_session: Arc<ChatSession>) -> Router {
+pub fn root(
+    endpoint: Option<String>,
+    server_events_tx: mpsc::Sender<ServerEvent>,
+    chat_session: Arc<ChatSession>,
+) -> Router {
     Router::with_hoop(affix_state::inject(server_events_tx).inject(chat_session))
         .push(
-            Router::with_path("v1")
-                .push(Router::with_path("chat/completions").post(chat_completions))
-                .push(Router::with_path("models").get(todo))
-                .push(Router::with_path("embeddings").get(todo))
-                .push(Router::with_path("files").get(todo))
-                .push(Router::with_path("chunks").get(todo))
-                .push(Router::with_path("info").get(todo))
-                .push(Router::with_path("realtime").get(todo)),
+            if let Some(endpoint) = endpoint {
+                Router::with_path(endpoint)
+            } else {
+                Router::new()
+            }
+            .push(Router::with_path("chat/completions").post(chat_completions))
+            .push(Router::with_path("models").get(todo))
+            .push(Router::with_path("embeddings").get(todo))
+            .push(Router::with_path("files").get(todo))
+            .push(Router::with_path("chunks").get(todo))
+            .push(Router::with_path("info").get(todo))
+            .push(Router::with_path("realtime").get(todo)),
         )
         .push(Router::with_path("{**path}").get(index))
 }
@@ -82,9 +89,9 @@ async fn chat_completions(
     //     let _ = res.add_header("user", id, true);
     //     res.stream(stream);
     // } else {
-        let response = chat_session.chat(chat_request).await.unwrap();
-        let _ = res.add_header("user", id, true);
-        res.render(Json(response));
+    let response = chat_session.chat(chat_request).await.unwrap();
+    let _ = res.add_header("user", id, true);
+    res.render(Json(response));
     // };
     tracing::info!("Send the chat completion response.");
     Ok(())
