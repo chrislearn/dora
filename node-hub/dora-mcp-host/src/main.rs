@@ -42,7 +42,7 @@ async fn main() -> eyre::Result<()> {
         .await
         .context("failed to create chat session")?;
 
-    let mut reply_channels: HashMap<String, oneshot::Sender<ChatCompletionResponse>> =
+    let mut reply_channels: HashMap<String, (oneshot::Sender<ChatCompletionResponse>, u64, Option<String>)> =
         HashMap::new();
 
     let acceptor = TcpListener::new(&config.listen_addr).bind().await;
@@ -84,10 +84,10 @@ async fn main() -> eyre::Result<()> {
                     let call_id = gen_call_id();
                     metadata.insert("__dora_call_id".into(), Parameter::String(call_id.clone()));
                     let texts = request.to_texts();
-                    node.send_output(output_id, Default::default(), StringArray::from(texts))
+                    node.send_output(output_id.clone(), Default::default(), StringArray::from(texts))
                         .context("failed to send dora output")?;
 
-                    reply_channels.insert(call_id, reply);
+                    reply_channels.insert(call_id, (reply, 0_u64, request.model));
                 }
             },
             MergedEvent::Dora(event) => match event {
@@ -104,7 +104,7 @@ async fn main() -> eyre::Result<()> {
                                 tracing::warn!("No call ID found in metadata for id: {}", id);
                                 continue;
                             };
-                            let reply_channel =
+                            let (reply_channel, prompt_tokens, model) =
                                 reply_channels.remove(call_id).context("no reply channel")?;
                             let data = data.as_string::<i32>();
                             let data = data.iter().fold("".to_string(), |mut acc, s| {
@@ -119,22 +119,22 @@ async fn main() -> eyre::Result<()> {
                                 id: format!("completion-{}", uuid::Uuid::new_v4()),
                                 object: "chat.completion".to_string(),
                                 created: chrono::Utc::now().timestamp() as u64,
-                                model: "".into(), // TODO
-                                choices: vec![ChatCompletionResponseChoice {
-                                    index: 0,
-                                    message: ChatCompletionMessage {
-                                        role: ChatCompletionRole::Assistant.to_string(),
-                                        content: data.to_string().into(),
-                                        tool_calls: Vec::new(),
-                                    },
-                                    finish_reason: FinishReason::stop,
-                                    logprobs: None,
-                                }],
+                                model: model.unwrap_or_default(),
                                 usage: Usage {
                                     prompt_tokens,
                                     completion_tokens: data.len() as u64,
                                     total_tokens: prompt_tokens + data.len() as u64,
                                 },
+                                choices: vec![ChatCompletionResponseChoice {
+                                    index: 0,
+                                    message: ChatCompletionMessage {
+                                        role: ChatCompletionRole::Assistant.to_string(),
+                                        content: ChatCompletionContent::new_text(data),
+                                        tool_calls: None,
+                                    },
+                                    finish_reason: FinishReason::stop,
+                                    logprobs: None,
+                                }],
                             };
 
                             if reply_channel.send(data).is_err() {
