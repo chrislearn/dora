@@ -1,0 +1,18 @@
+listen_addr = "0.0.0.0:8118"
+endpoint = "v1"
+
+[model_service]
+provider = "gemini"
+api_key = "AIzaSyC_kTTfK6C-737Xn10or9RdwkKCqAnioR8"
+api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+
+# [model_service]
+# provider = "dora"
+# output = "output"
+
+# [[mcp_servers]]
+# name = "MCP server name"
+# protocol = "stdio"
+# command = "MCP server path"
+# args = [" "]

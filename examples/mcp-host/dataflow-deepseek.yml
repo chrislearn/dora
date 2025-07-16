@@ -6,6 +6,8 @@ nodes:
       - text
     inputs:
       text: dora-echo/echo
+    env:
+      CONFIG: config-deepseek.toml
 
   - id: dora-echo
     build: pip install -e ../../node-hub/dora-echo
