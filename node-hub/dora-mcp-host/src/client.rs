@@ -108,14 +108,13 @@ impl ChatClient for DeepseekClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            println!("API error: {}", error_text);
+            println!("API error: {}  request: {:#?}", error_text, request);
             return Err(eyre!("API Error: {}", error_text));
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
         let completion: ChatCompletionResponse = serde_json::from_str(&text_data)
-            .map_err(eyre::Report::from)
-            .unwrap();
+            .map_err(eyre::Report::from)?;
         Ok(completion)
     }
 }

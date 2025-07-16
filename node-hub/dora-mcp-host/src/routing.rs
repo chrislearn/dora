@@ -55,7 +55,13 @@ async fn chat_completions(
 
     tracing::info!("Prepare the chat completion request.");
 
-    let mut chat_request = req.parse_json::<ChatCompletionRequest>().await?;
+    let mut chat_request = match  req.parse_json::<ChatCompletionRequest>().await{
+        Ok(chat_requst) => chat_requst,
+        Err(e) => {
+            println!("parse request error: {e}, payload: {}", String::from_utf8_lossy(req.payload().await?));
+            return Err(e.into());
+        }
+    };
 
     // check if the user id is provided
     if chat_request.user.is_none() {
@@ -89,7 +95,7 @@ async fn chat_completions(
     //     let _ = res.add_header("user", id, true);
     //     res.stream(stream);
     // } else {
-    let response = chat_session.chat(chat_request).await.unwrap();
+    let response = chat_session.chat(chat_request).await?;
     let _ = res.add_header("user", id, true);
     res.render(Json(response));
     // };

@@ -25,6 +25,8 @@ pub enum AppError {
     Send(#[from] tokio::sync::mpsc::error::SendError<ServerEvent>),
     #[error("canceled: `{0}`")]
     Canceled(#[from] futures::channel::oneshot::Canceled),
+    #[error("error report: `{0}`")]
+    ErrReport(#[from] eyre::Report),
     // #[error("reqwest: `{0}`")]
     // Reqwest(#[from] reqwest::Error),
 }

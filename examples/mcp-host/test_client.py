@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 50 + "\n")
 
-    test_chat_completion_image_url(chat_input)
-    print("\n" + "=" * 50 + "\n")
-    test_chat_completion_image_base64(chat_input)
-    print("\n" + "=" * 50 + "\n")
+    # test_chat_completion_image_url(chat_input)
+    # print("\n" + "=" * 50 + "\n")
+    # test_chat_completion_image_base64(chat_input)
+    # print("\n" + "=" * 50 + "\n")

@@ -1,13 +1,11 @@
-use std::{
-    sync::Arc,
-};
+use std::sync::Arc;
 
-use eyre::{Result};
+use eyre::Result;
 use serde_json;
 
 use crate::client::ChatClient;
 use crate::{
-    models::{ChatCompletionMessage, ChatCompletionResponse, ChatCompletionRequest, ToolFunction},
+    models::{ChatCompletionMessage, ChatCompletionRequest, ChatCompletionResponse, ToolFunction},
     tool::{Tool as ToolTrait, ToolSet},
 };
 
@@ -36,7 +34,7 @@ impl ChatSession {
         self.tool_set.tools()
     }
 
-    pub async fn analyze_tool_call(& self, response: &ChatCompletionMessage) {
+    pub async fn analyze_tool_call(&self, response: &ChatCompletionMessage) {
         let mut tool_calls_func = Vec::new();
         if let Some(tool_calls) = response.tool_calls.as_ref() {
             for tool_call in tool_calls {
@@ -118,7 +116,7 @@ impl ChatSession {
             }
         }
     }
-    pub async fn chat(& self, mut request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+    pub async fn chat(&self, mut request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         // self.messages.push(ChatCompletionMessage::user(&input));
 
         let tools = self.tool_set.tools();
@@ -137,17 +135,17 @@ impl ChatSession {
             None
         };
 
-
         request.model = self.model.clone();
         request.tools = tool_definitions;
 
         // send request
         let response = self.client.complete(request).await?;
         // get choice
-        let choice = response.choices.first().unwrap();
-        println!("AI > {:#?}", choice.message.to_texts());
-        // analyze tool call
-        self.analyze_tool_call(&choice.message).await;
+        if let Some(choice) = response.choices.first() {
+            println!("AI > {:#?}", choice.message.to_texts());
+            // analyze tool call
+            self.analyze_tool_call(&choice.message).await;
+        }
 
         Ok(response)
     }
