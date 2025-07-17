@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use eyre::Result;
 use serde_json;
@@ -13,7 +13,7 @@ pub struct ChatSession {
     client: Arc<dyn ChatClient>,
     tool_set: ToolSet,
     model: Option<String>,
-    // messages: Vec<ChatCompletionMessage>,
+    messages: Mutex<Vec<ChatCompletionMessage>>,
 }
 
 impl ChatSession {
@@ -22,12 +22,13 @@ impl ChatSession {
             client,
             tool_set,
             model,
-            // messages: Vec::new(),
+            messages: Default::default(),
         }
     }
 
     pub fn add_system_prompt(&mut self, prompt: impl ToString) {
-        // self.messages.push(ChatCompletionMessage::system(prompt));
+        let mut messages = self.messages.lock().expect("messages should locked");
+        messages.push(ChatCompletionMessage::system(prompt));
     }
 
     pub fn get_tools(&self) -> Vec<Arc<dyn ToolTrait>> {
@@ -82,9 +83,11 @@ impl ChatSession {
                 match tool.call(args).await {
                     Ok(result) => {
                         if result.is_error.is_some_and(|b| b) {
-                            // self.messages.push(ChatCompletionMessage::user(
-                            //     "tool call failed, mcp call error",
-                            // ));
+                            let mut messages =
+                                self.messages.lock().expect("messages should locked");
+                            messages.push(ChatCompletionMessage::user(
+                                "tool call failed, mcp call error",
+                            ));
                         } else {
                             result.content.iter().for_each(|content| {
                                 if let Some(content_text) = content.as_text() {
@@ -95,20 +98,23 @@ impl ChatSession {
                                     let pretty_result =
                                         serde_json::to_string_pretty(&json_result).unwrap();
                                     println!("call tool result: {}", pretty_result);
-                                    // self.messages.push(ChatCompletionMessage::user(format!(
-                                    //     "call tool result: {}",
-                                    //     pretty_result
-                                    // )));
+                                    let mut messages =
+                                        self.messages.lock().expect("messages should locked");
+                                    messages.push(ChatCompletionMessage::user(format!(
+                                        "call tool result: {}",
+                                        pretty_result
+                                    )));
                                 }
                             });
                         }
                     }
                     Err(e) => {
                         println!("tool call failed: {}", e);
-                        // self.messages.push(ChatCompletionMessage::user(format!(
-                        //     "tool call failed: {}",
-                        //     e
-                        // )));
+                        let mut messages = self.messages.lock().expect("messages should locked");
+                        messages.push(ChatCompletionMessage::user(format!(
+                            "tool call failed: {}",
+                            e
+                        )));
                     }
                 }
             } else {
@@ -117,8 +123,12 @@ impl ChatSession {
         }
     }
     pub async fn chat(&self, mut request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
-        // self.messages.push(ChatCompletionMessage::user(&input));
-
+        {
+            let mut messages = self.messages.lock().expect("messages should locked");
+            for message in request.messages.iter() {
+                messages.push(message.clone());
+            }
+        }
         let tools = self.tool_set.tools();
         let tool_definitions = if !tools.is_empty() {
             Some(
