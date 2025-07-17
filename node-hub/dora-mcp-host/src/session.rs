@@ -125,9 +125,10 @@ impl ChatSession {
     pub async fn chat(&self, mut request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         {
             let mut messages = self.messages.lock().expect("messages should locked");
-            for message in request.messages.iter() {
-                messages.push(message.clone());
+            for message in std::mem::take(&mut request.messages) {
+                messages.push(message);
             }
+            request.messages = messages.clone();
         }
         let tools = self.tool_set.tools();
         let tool_definitions = if !tools.is_empty() {
