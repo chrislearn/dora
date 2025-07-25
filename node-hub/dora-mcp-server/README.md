@@ -30,9 +30,11 @@ version = "0.1.0"
 
 # You can set your custom listen address and endpoint here.
 # Default listen address is "0.0.0.0:8008" and endpoint is "mcp".
+# In this example, the final service url is: http://0.0.0.0:8181/mcp
 listen_addr = "0.0.0.0:8181"
 endpoint = "mcp"
 
+# Too definition structure: https://modelcontextprotocol.io/docs/concepts/tools#tool-definition-structure
 [[mcp_tools]]
 name = "counter_decrement"
 input_schema = "empty_object.json"
