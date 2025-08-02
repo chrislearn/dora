@@ -15,7 +15,7 @@ pub fn root(endpoint: Option<String>, chat_session: Arc<ChatSession>) -> Router 
                 Router::new()
             }
             .push(Router::with_path("chat/completions").post(chat_completions))
-            .push(Router::with_path("models").get(todo))
+            .push(Router::with_path("models").get(list_models))
             .push(Router::with_path("embeddings").get(todo))
             .push(Router::with_path("files").get(todo))
             .push(Router::with_path("chunks").get(todo))
@@ -32,6 +32,25 @@ async fn todo(res: &mut Response) {
 #[handler]
 async fn index(res: &mut Response) {
     res.render(Text::Plain("Hello"));
+}
+
+#[handler]
+async fn list_models(depot: &mut Depot, res: &mut Response) {
+    let chat_session = depot
+        .obtain::<Arc<ChatSession>>()
+        .expect("chat session must be exists");
+
+    let mut models = Vec::new();
+    for model in &chat_session.models {
+        // TODO: fill correct data
+        models.push(Model {
+            id: model.id.clone(),
+            object: "model".to_string(),
+            created: 0,
+            owned_by: "dora".to_string(),
+        });
+    }
+    res.render(Json(models));
 }
 
 #[handler]

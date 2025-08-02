@@ -1,7 +1,10 @@
 """TODO: Add docstring."""
 from openai import OpenAI
+import httpx
 
-client = OpenAI(base_url="http://127.0.0.1:8118/v1", api_key="dummy_api_key")
+transport = httpx.HTTPTransport(proxy=None) 
+http_client = httpx.Client(transport=transport)
+client = OpenAI(base_url="http://127.0.0.1:8118/v1", api_key="dummy_api_key", http_client=http_client)
 
 def test_list_models():
     """TODO: Add docstring."""
@@ -18,7 +21,7 @@ def test_chat_completion(user_input):
     """TODO: Add docstring."""
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="kimi-k2-0711-preview",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input},
@@ -34,7 +37,7 @@ def test_chat_completion_image_url(user_input):
     """TODO: Add docstring."""
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="kimi-k2-0711-preview",
             messages=[
                 {
                     "role": "user",

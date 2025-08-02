@@ -8,6 +8,19 @@ use serde::{
 };
 use serde_json::Value;
 
+/// Describes an OpenAI model offering that can be used with the API.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct Model {
+    /// The model identifier, which can be referenced in the API endpoints.
+    pub id: String,
+    /// The object type, which is always "model".
+    pub object: String,
+    /// The Unix timestamp (in seconds) when the model was created.
+    pub created: u32,
+    /// The organization that owns the model.
+    pub owned_by: String,
+}
+
 // Forked from https://github.com/LlamaEdge/LlamaEdge/blob/6bfe9c12c85bf390c47d6065686caeca700feffa/crates/endpoints/src/chat.rs#L304
 /// Represents a chat completion request.
 #[derive(Debug, Serialize, Default)]

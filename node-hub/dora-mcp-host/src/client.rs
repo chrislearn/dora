@@ -1,12 +1,11 @@
 use tokio::sync::mpsc;
 
-use eyre::eyre;
-use eyre::Result;
+use eyre::{eyre, Result};
 use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
-use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig};
+use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig, OpenaiConfig, MoonshotConfig};
 use crate::models::{ChatCompletionRequest, ChatCompletionResponse};
 use crate::ServerEvent;
 
@@ -94,6 +93,108 @@ impl DeepseekClient {
 
 #[async_trait]
 impl ChatClient for DeepseekClient {
+    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+        let response = self
+            .client
+            .post(&format!("{}/chat/completions", self.api_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(eyre!("API Error: {}", error_text));
+        }
+        let text_data = response.text().await?;
+        println!("Received response: {}", text_data);
+        let completion: ChatCompletionResponse =
+            serde_json::from_str(&text_data).map_err(eyre::Report::from)?;
+        Ok(completion)
+    }
+}
+
+
+#[derive(Debug)]
+pub struct OpenaiClient {
+    api_key: String,
+    api_url: String,
+    client: HttpClient,
+}
+
+impl OpenaiClient {
+    pub fn new(config: &OpenaiConfig) -> Self {
+        let client = if config.proxy {
+            HttpClient::new()
+        } else {
+            HttpClient::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_else(|_| HttpClient::new())
+        };
+
+        Self {
+            api_key: config.api_key.clone(),
+            api_url: config.api_url.clone(),
+            client,
+        }
+    }
+}
+
+#[async_trait]
+impl ChatClient for OpenaiClient {
+    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+        let response = self
+            .client
+            .post(&format!("{}/chat/completions", self.api_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(eyre!("API Error: {}", error_text));
+        }
+        let text_data = response.text().await?;
+        println!("Received response: {}", text_data);
+        let completion: ChatCompletionResponse =
+            serde_json::from_str(&text_data).map_err(eyre::Report::from)?;
+        Ok(completion)
+    }
+}
+
+
+#[derive(Debug)]
+pub struct MoonshotClient {
+    api_key: String,
+    api_url: String,
+    client: HttpClient,
+}
+
+impl MoonshotClient {
+    pub fn new(config: &MoonshotConfig) -> Self {
+        let client = if config.proxy {
+            HttpClient::new()
+        } else {
+            HttpClient::builder()
+                .no_proxy()
+                .build()
+                .unwrap_or_else(|_| HttpClient::new())
+        };
+
+        Self {
+            api_key: config.api_key.clone(),
+            api_url: config.api_url.clone(),
+            client,
+        }
+    }
+}
+
+#[async_trait]
+impl ChatClient for MoonshotClient {
     async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
         let response = self
             .client

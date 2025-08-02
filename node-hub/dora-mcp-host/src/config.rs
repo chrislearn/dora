@@ -11,7 +11,7 @@ use figment::Figment;
 use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
 use serde::{Deserialize, Serialize};
 
-use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient};
+use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient, MoonshotClient, OpenaiClient};
 use crate::{ChatSession, ServerEvent, ToolSet};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -61,10 +61,11 @@ pub struct Config {
     #[serde(default = "default_endpoint")]
     pub endpoint: Option<String>,
 
-    pub model_service: Option<ModelServiceConfig>,
+    pub providers: Vec<ProviderConfig>,
+    pub models: Vec<ModelConfig>,
 
     pub mcp: Option<McpConfig>,
-    #[serde(default = "default_false")]
+    #[serde(default = "default_true")]
     pub support_tool: bool,
 }
 fn default_listen_addr() -> String {
@@ -74,43 +75,127 @@ fn default_endpoint() -> Option<String> {
     Some("v1".to_owned())
 }
 
-fn default_false() -> bool {
-    false
-}
-fn default_gemini_api_url() -> String {
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-        .to_owned()
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "provider", rename_all = "snake_case")]
-pub enum ModelServiceConfig {
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ProviderConfig {
     Gemini(GeminiConfig),
     Deepseek(DeepseekConfig),
+    Openai(OpenaiConfig),
+    Moonshot(MoonshotConfig),
     Dora(DoraConfig),
+}
+impl ProviderConfig {
+    pub fn id(&self) -> &str {
+        match self {
+            ProviderConfig::Gemini(config) => &*config.id,
+            ProviderConfig::Deepseek(config) => &*config.id,
+            ProviderConfig::Openai(config) => &*config.id,
+            ProviderConfig::Moonshot(config) => &*config.id,
+            ProviderConfig::Dora(config) => &*config.id,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GeminiConfig {
+    pub id: String,
+    #[serde(default = "default_gemini_api_key")]
     pub api_key: String,
     #[serde(default = "default_gemini_api_url")]
     pub api_url: String,
-    #[serde(default = "default_false")]
+    #[serde(default)]
     pub proxy: bool,
+}
+fn default_gemini_api_key() -> String {
+    std::env::var("GEMINI_API_KEY").unwrap_or_default()
+}
+fn default_gemini_api_url() -> String {
+    std::env::var("GEMINI_API_URL").unwrap_or_else(|_|"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent".to_owned())
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DeepseekConfig {
+    pub id: String,
+    #[serde(default = "default_deepseek_api_key")]
     pub api_key: String,
-    #[serde(default = "default_gemini_api_url")]
+    #[serde(default = "default_deepseek_api_url")]
     pub api_url: String,
-    #[serde(default = "default_false")]
+    #[serde(default)]
     pub proxy: bool,
+}
+fn default_deepseek_api_key() -> String {
+    std::env::var("DEEPSEEK_API_KEY").unwrap_or_default()
+}
+fn default_deepseek_api_url() -> String {
+    std::env::var("DEEPSEEK_API_URL").unwrap_or_else(|_| "https://api.deepseek.com".to_owned())
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct OpenaiConfig {
+    pub id: String,
+    #[serde(default = "default_openai_api_key")]
+    pub api_key: String,
+    #[serde(default = "default_openai_api_url")]
+    pub api_url: String,
+    #[serde(default)]
+    pub proxy: bool,
+}
+fn default_openai_api_key() -> String {
+    std::env::var("OPENAI_API_KEY").unwrap_or_default()
+}
+fn default_openai_api_url() -> String {
+    std::env::var("OPENAI_API_URL")
+        .unwrap_or_else(|_| "https://api.openai.com/v1/chat/completions".to_owned())
+}
+
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct MoonshotConfig {
+    pub id: String,
+    #[serde(default = "default_moonshot_api_key")]
+    pub api_key: String,
+    #[serde(default = "default_moonshot_api_url")]
+    pub api_url: String,
+    #[serde(default)]
+    pub proxy: bool,
+}
+fn default_moonshot_api_key() -> String {
+    std::env::var("MOONSHOT_API_KEY").unwrap_or_default()
+}
+fn default_moonshot_api_url() -> String {
+    std::env::var("MOONSHOT_API_URL")
+        .unwrap_or_else(|_| "https://api.moonshot.cn".to_owned())
+}
+
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct DoraConfig {
+    pub id: String,
     pub output: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "model", rename_all = "snake_case")]
+pub struct ModelConfig {
+    pub id: String,
+    pub object: Option<String>,
+    pub created: Option<u64>,
+    pub owned_by: Option<String>,
+
+    #[serde(default)]
+    pub default: bool,
+    pub route: ModelRouteConfig,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(tag = "route", rename_all = "snake_case")]
+pub struct ModelRouteConfig {
+    pub provider: String,
+    pub model: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -190,16 +275,24 @@ impl Config {
         Ok(clients)
     }
 
-    fn create_client(&self, server_events_tx: mpsc::Sender<ServerEvent>) -> Arc<dyn ChatClient> {
-        match &self.model_service {
-            Some(ModelServiceConfig::Gemini(config)) => Arc::new(GeminiClient::new(config)),
-            Some(ModelServiceConfig::Deepseek(config)) => Arc::new(DeepseekClient::new(config)),
-            Some(ModelServiceConfig::Dora(config)) => Arc::new(DoraClient::new(config, server_events_tx)),
-            None => {
-                eprintln!("No model service configured. Please check your config file.");
-                std::process::exit(1);
-            }
+    fn create_chat_clients(
+        &self,
+        server_events_tx: mpsc::Sender<ServerEvent>,
+    ) -> HashMap<String, Arc<dyn ChatClient>> {
+        let mut clients: HashMap<String, Arc<dyn ChatClient>> = HashMap::new();
+        for provider in &self.providers {
+            let client: Arc<dyn ChatClient> = match provider {
+                ProviderConfig::Gemini(config) => Arc::new(GeminiClient::new(config)),
+                ProviderConfig::Deepseek(config) => Arc::new(DeepseekClient::new(config)),
+                ProviderConfig::Openai(config) => Arc::new(OpenaiClient::new(config)),
+                ProviderConfig::Moonshot(config) => Arc::new(MoonshotClient::new(config)),
+                ProviderConfig::Dora(config) => {
+                    Arc::new(DoraClient::new(config, server_events_tx.clone()))
+                }
+            };
+            clients.insert(provider.id().to_owned(), client);
         }
+        clients
     }
 
     pub async fn create_session(
@@ -223,9 +316,9 @@ impl Config {
         }
 
         Ok(ChatSession::new(
-            self.create_client(server_events_tx).into(),
+            self.create_chat_clients(server_events_tx).into(),
+            get().models.clone(),
             tool_set,
-            Some("deepseek-chat".to_string()),
         ))
     }
 }

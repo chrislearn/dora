@@ -1,29 +1,58 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use eyre::Result;
 use serde_json;
 
 use crate::client::ChatClient;
+use crate::config::ModelConfig;
 use crate::{
     models::{ChatCompletionMessage, ChatCompletionRequest, ChatCompletionResponse, ToolFunction},
     tool::{Tool as ToolTrait, ToolSet},
 };
 
 pub struct ChatSession {
-    client: Arc<dyn ChatClient>,
-    tool_set: ToolSet,
-    model: Option<String>,
-    messages: Mutex<Vec<ChatCompletionMessage>>,
+    pub chat_clients: HashMap<String, Arc<dyn ChatClient>>,
+    pub models: Vec<ModelConfig>,
+    pub tool_set: ToolSet,
+    pub messages: Mutex<Vec<ChatCompletionMessage>>,
 }
 
 impl ChatSession {
-    pub fn new(client: Arc<dyn ChatClient>, tool_set: ToolSet, model: Option<String>) -> Self {
+    pub fn new(
+        chat_clients: HashMap<String, Arc<dyn ChatClient>>,
+        models: Vec<ModelConfig>,
+        tool_set: ToolSet,
+    ) -> Self {
         Self {
-            client,
+            chat_clients,
+            models,
             tool_set,
-            model,
             messages: Default::default(),
         }
+    }
+
+    pub fn default_model(&self) -> Option<&str> {
+        let model = self
+            .models
+            .iter()
+            .find(|model| model.default)
+            .map(|model| &*model.id);
+        if model.is_none() {
+            self.models.first().map(|model| &*model.id)
+        } else {
+            model
+        }
+    }
+
+    pub fn route(&self, model: &str) -> Option<(Arc<dyn ChatClient>, String)> {
+        let model = self.models.iter().find(|m| m.id == model)?;
+        let route = &model.route;
+        let client = self.chat_clients.get(&route.provider)?;
+        Some((
+            client.clone(),
+            route.model.clone().unwrap_or(model.id.clone()),
+        ))
     }
 
     pub fn add_system_prompt(&mut self, prompt: impl ToString) {
@@ -146,11 +175,16 @@ impl ChatSession {
             None
         };
 
-        request.model = self.model.clone();
+        let model = request.model.as_deref().unwrap_or_else(|| {
+            self.default_model()
+                .expect("No default model found, please set a default model in the config")
+        });
+        let (client, model) = self.route(model).expect("failed to route model");
+        request.model = Some(model);
         request.tools = tool_definitions;
 
         // send request
-        let response = self.client.complete(request).await?;
+        let response = client.complete(request).await?;
         // get choice
         if let Some(choice) = response.choices.first() {
             println!("AI > {:#?}", choice.message.to_texts());

@@ -2805,6 +2805,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a79c4acb1fd5fa3d9304be4c76e031c54d2e92d172a393e24b19a14fe8532fe9"
+dependencies = [
+ "darling_core 0.21.0",
+ "darling_macro 0.21.0",
+]
+
+[[package]]
 name = "darling_core"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2833,6 +2843,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74875de90daf30eb59609910b84d4d368103aaec4c924824c6799b28f77d6a1d"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim 0.11.1",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2850,6 +2874,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc34b93ccb385b40dc71c6fceac4b2ad23662c7eeb248cf10d529b7e055b6ead"
 dependencies = [
  "darling_core 0.20.11",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e79f8e61677d5df9167cd85265f8e5f64b215cdea3fb55eebc3e622e44c7a146"
+dependencies = [
+ "darling_core 0.21.0",
  "quote",
  "syn 2.0.104",
 ]
@@ -3406,8 +3441,8 @@ dependencies = [
  "indexmap 2.10.0",
  "mime_guess",
  "reqwest",
- "rmcp",
- "salvo",
+ "rmcp 0.3.2",
+ "salvo 0.81.0",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -3429,8 +3464,8 @@ dependencies = [
  "futures",
  "indexmap 2.10.0",
  "mime_guess",
- "rmcp",
- "salvo",
+ "rmcp 0.2.1",
+ "salvo 0.80.0",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -12385,13 +12420,34 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures",
+ "paste",
+ "pin-project-lite",
+ "rmcp-macros 0.2.1",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "rmcp"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f0d0d5493be0d181a62db489eab7838669b81885972ca00ceca893cf6ac2883"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "futures",
  "http 1.3.1",
  "paste",
  "pin-project-lite",
  "process-wrap",
  "reqwest",
- "rmcp-macros",
- "schemars 0.8.22",
+ "rmcp-macros 0.3.2",
+ "schemars 1.0.4",
  "serde",
  "serde_json",
  "sse-stream",
@@ -12409,6 +12465,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72398e694b9f6dbb5de960cf158c8699e6a1854cb5bbaac7de0646b2005763c4"
 dependencies = [
  "darling 0.20.11",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "rmcp-macros"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4aebc912b8fa7d54999adc4e45601d1d95fe458f97eb0a1277eddcd6382cf4b1"
+dependencies = [
+ "darling 0.21.0",
  "proc-macro2",
  "quote",
  "serde_json",
@@ -12967,11 +13036,22 @@ version = "0.80.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ce0331005d85590a43295118391452dd04cf7826c2f8251c2362874b8d8b67a"
 dependencies = [
- "salvo-cors",
+ "salvo-cors 0.80.0",
  "salvo-jwt-auth",
  "salvo-proxy",
- "salvo_core",
- "salvo_extra",
+ "salvo_core 0.80.0",
+ "salvo_extra 0.80.0",
+]
+
+[[package]]
+name = "salvo"
+version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cc05fe965153805873da91f7a0a65e69a4173fff562ed553f8e2e6a9ff5bce7"
+dependencies = [
+ "salvo-cors 0.81.0",
+ "salvo_core 0.81.0",
+ "salvo_extra 0.81.0",
 ]
 
 [[package]]
@@ -12981,7 +13061,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "307be0c582399615bc81e2b5706647f3cf2f8a98edb294a8344917facb17e648"
 dependencies = [
  "bytes",
- "salvo_core",
+ "salvo_core 0.80.0",
+ "tracing",
+]
+
+[[package]]
+name = "salvo-cors"
+version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c791806c8f21342ec558a9b7b6fe7d2e6a0d9d98e85b487e01804a8d72db0453"
+dependencies = [
+ "bytes",
+ "salvo_core 0.81.0",
  "tracing",
 ]
 
@@ -12997,7 +13088,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "jsonwebtoken",
- "salvo_core",
+ "salvo_core 0.80.0",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -13018,7 +13109,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "reqwest",
- "salvo_core",
+ "salvo_core 0.80.0",
  "tokio",
  "tracing",
 ]
@@ -13028,6 +13119,17 @@ name = "salvo-serde-util"
 version = "0.80.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2014d193ab04bf917c574c155801279474becd532a02f7dbe64928bdd2b072a4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "salvo-serde-util"
+version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78b2cd0a2b0073c85f10eefa3722dbae18e3c2c9a2567f9d840ecc712127e30c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -13066,7 +13168,51 @@ dependencies = [
  "rand 0.9.1",
  "regex",
  "rustls-pemfile 2.2.0",
- "salvo_macros",
+ "salvo_macros 0.80.0",
+ "serde",
+ "serde-xml-rs 0.8.1",
+ "serde_json",
+ "sync_wrapper",
+ "tempfile",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "salvo_core"
+version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b0978458bee0102c6c337040ea0b13c497ff1e31015c49c2cc9a387f813e2c1"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "enumflags2",
+ "form_urlencoded",
+ "futures-channel",
+ "futures-util",
+ "headers",
+ "http 1.3.1",
+ "http-body-util",
+ "hyper 1.6.0",
+ "hyper-rustls",
+ "hyper-util",
+ "indexmap 2.10.0",
+ "mime",
+ "mime-infer",
+ "multer",
+ "multimap",
+ "nix 0.30.1",
+ "parking_lot",
+ "percent-encoding",
+ "pin-project",
+ "rand 0.9.1",
+ "regex",
+ "rustls-pemfile 2.2.0",
+ "salvo_macros 0.81.0",
  "serde",
  "serde-xml-rs 0.8.1",
  "serde_json",
@@ -13091,7 +13237,29 @@ dependencies = [
  "http-body-util",
  "hyper 1.6.0",
  "pin-project",
- "salvo_core",
+ "salvo_core 0.80.0",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite 0.27.0",
+ "tower 0.5.2",
+ "tracing",
+ "ulid",
+]
+
+[[package]]
+name = "salvo_extra"
+version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c02e85aa76fe3213ddf45eb9d58a5dace805c2d655804283e0fd4ba4c6a67811"
+dependencies = [
+ "base64 0.22.1",
+ "etag",
+ "futures-util",
+ "http-body-util",
+ "hyper 1.6.0",
+ "pin-project",
+ "salvo_core 0.81.0",
  "serde",
  "serde_json",
  "tokio",
@@ -13111,7 +13279,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "salvo-serde-util",
+ "salvo-serde-util 0.80.0",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "salvo_macros"
+version = "0.81.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b74585140d4b656e51bd95e985c7acb8e57fe3d25f2dbb7c2b21fec30a8a91ef"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "salvo-serde-util 0.81.0",
  "syn 2.0.104",
 ]
 
@@ -13148,7 +13330,7 @@ dependencies = [
  "chrono",
  "dyn-clone",
  "either",
- "schemars_derive",
+ "schemars_derive 0.8.22",
  "serde",
  "serde_json",
 ]
@@ -13171,8 +13353,10 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82d20c4491bc164fa2f6c5d44565947a52ad80b9505d8e36f8d54c27c739fcd0"
 dependencies = [
+ "chrono",
  "dyn-clone",
  "ref-cast",
+ "schemars_derive 1.0.4",
  "serde",
  "serde_json",
 ]
@@ -13182,6 +13366,18 @@ name = "schemars_derive"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33d020396d1d138dc19f1165df7545479dcd58d93810dc5d646a16e55abefa80"
 dependencies = [
  "proc-macro2",
  "quote",

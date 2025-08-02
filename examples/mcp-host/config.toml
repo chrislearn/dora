@@ -1,0 +1,47 @@
+listen_addr = "0.0.0.0:8118"
+endpoint = "v1"
+
+[[providers]]
+id = "moonshot"
+kind ="moonshot"
+# api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+api_url = "https://api.deepseek.com"
+
+
+[[providers]]
+id = "gemini"
+kind ="gemini"
+# api_key = "AIzaSyC_kTTfK6C-737Xn10or9RdwkKCqAnioR8"
+api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+[[providers]]
+id = "deepseek"
+kind ="deepseek"
+# api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+api_url = "https://api.deepseek.com"
+
+# [[providers]]
+# id = "openai"
+# # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+# api_url = "https://api.openai.com/v1/"
+
+[[providers]]
+id = "dora"
+kind ="dora"
+output = "output"
+
+[[models]]
+id = "kimi-k2-0711-preview"
+default = true
+route = { provider = "moonshot", model = "kimi-k2-0711-preview" }
+
+[[models]]
+id = "gemini-2.0-flash"
+route = { provider = "gemini", model = "gemini-2.0-flash" }
+
+
+# [[mcp_servers]]
+# name = "MCP server name"
+# protocol = "stdio"
+# command = "MCP server path"
+# args = [" "]
