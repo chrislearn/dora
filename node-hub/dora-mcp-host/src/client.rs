@@ -194,6 +194,7 @@ impl MoonshotClient {
 #[async_trait]
 impl ChatClient for MoonshotClient {
     async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+        println!("===========self.api_url: {}", self.api_url);
         println!("===========self.api_key: {}", self.api_key);
         println!("{request:?}");
         let response = self

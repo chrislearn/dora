@@ -3,9 +3,9 @@ endpoint = "v1"
 
 [[providers]]
 id = "moonshot"
-kind ="moonshot"
+kind ="openai"
 # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
-api_url = "https://api.deepseek.com"
+api_url = "https://api.moonshot.cn/v1"
 
 [[providers]]
 id = "gemini"
@@ -22,7 +22,7 @@ api_url = "https://api.deepseek.com"
 # [[providers]]
 # id = "openai"
 # # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
-# api_url = "https://api.openai.com/v1/"
+# api_url = "https://api.openai.com/v1"
 
 [[providers]]
 id = "dora"

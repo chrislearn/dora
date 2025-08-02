@@ -168,7 +168,7 @@ fn default_moonshot_api_key() -> String {
 }
 fn default_moonshot_api_url() -> String {
     std::env::var("MOONSHOT_API_URL")
-        .unwrap_or_else(|_| "https://api.moonshot.cn".to_owned())
+        .unwrap_or_else(|_| "https://api.moonshot.cn/v1".to_owned())
 }
 
 
