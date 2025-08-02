@@ -21,7 +21,7 @@ def test_chat_completion(user_input):
     """TODO: Add docstring."""
     try:
         response = client.chat.completions.create(
-            model="kimi-k2-0711-preview",
+            model="kimi-latest",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input},
@@ -37,7 +37,7 @@ def test_chat_completion_image_url(user_input):
     """TODO: Add docstring."""
     try:
         response = client.chat.completions.create(
-            model="kimi-k2-0711-preview",
+            model="kimi-latest",
             messages=[
                 {
                     "role": "user",

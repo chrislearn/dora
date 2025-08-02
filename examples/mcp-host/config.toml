@@ -7,7 +7,6 @@ kind ="moonshot"
 # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
 api_url = "https://api.deepseek.com"
 
-
 [[providers]]
 id = "gemini"
 kind ="gemini"
@@ -31,9 +30,9 @@ kind ="dora"
 output = "output"
 
 [[models]]
-id = "kimi-k2-0711-preview"
+id = "kimi-latest"
 default = true
-route = { provider = "moonshot", model = "kimi-k2-0711-preview" }
+route = { provider = "moonshot", model = "kimi-latest" }
 
 [[models]]
 id = "gemini-2.0-flash"

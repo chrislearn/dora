@@ -5,7 +5,7 @@ use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
-use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig, OpenaiConfig, MoonshotConfig};
+use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig, MoonshotConfig, OpenaiConfig};
 use crate::models::{ChatCompletionRequest, ChatCompletionResponse};
 use crate::ServerEvent;
 
@@ -115,7 +115,6 @@ impl ChatClient for DeepseekClient {
     }
 }
 
-
 #[derive(Debug)]
 pub struct OpenaiClient {
     api_key: String,
@@ -166,7 +165,6 @@ impl ChatClient for OpenaiClient {
     }
 }
 
-
 #[derive(Debug)]
 pub struct MoonshotClient {
     api_key: String,
@@ -196,6 +194,8 @@ impl MoonshotClient {
 #[async_trait]
 impl ChatClient for MoonshotClient {
     async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+        println!("===========self.api_key: {}", self.api_key);
+        println!("{request:?}");
         let response = self
             .client
             .post(&format!("{}/chat/completions", self.api_url))
@@ -207,6 +207,7 @@ impl ChatClient for MoonshotClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
+            println!("Received response: {}", error_text);
             return Err(eyre!("API Error: {}", error_text));
         }
         let text_data = response.text().await?;
