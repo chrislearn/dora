@@ -4,7 +4,7 @@ endpoint = "v1"
 [[providers]]
 id = "moonshot"
 kind ="openai"
-# api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+api_key = "env:MOONSHOT_API_KEY"
 api_url = "https://api.moonshot.cn/v1"
 
 [[providers]]

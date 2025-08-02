@@ -1,3 +1,4 @@
+use figment::value;
 use tokio::sync::mpsc;
 
 use eyre::{eyre, Result};
@@ -5,7 +6,7 @@ use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
-use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig, MoonshotConfig, OpenaiConfig};
+use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig, OpenaiConfig};
 use crate::models::{ChatCompletionRequest, ChatCompletionResponse};
 use crate::ServerEvent;
 
@@ -33,8 +34,8 @@ impl GeminiClient {
         };
 
         Self {
-            api_key: config.api_key.clone(),
-            api_url: config.api_url.clone(),
+            api_key: get_env_or_value(&config.api_key),
+            api_url: get_env_or_value(&config.api_url),
             client,
         }
     }
@@ -84,8 +85,8 @@ impl DeepseekClient {
         };
 
         Self {
-            api_key: config.api_key.clone(),
-            api_url: config.api_url.clone(),
+            api_key: get_env_or_value(&config.api_key),
+            api_url: get_env_or_value(&config.api_url),
             client,
         }
     }
@@ -134,8 +135,8 @@ impl OpenaiClient {
         };
 
         Self {
-            api_key: config.api_key.clone(),
-            api_url: config.api_url.clone(),
+            api_key: get_env_or_value(&config.api_key),
+            api_url: get_env_or_value(&config.api_url),
             client,
         }
     }
@@ -155,60 +156,6 @@ impl ChatClient for OpenaiClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            return Err(eyre!("API Error: {}", error_text));
-        }
-        let text_data = response.text().await?;
-        println!("Received response: {}", text_data);
-        let completion: ChatCompletionResponse =
-            serde_json::from_str(&text_data).map_err(eyre::Report::from)?;
-        Ok(completion)
-    }
-}
-
-#[derive(Debug)]
-pub struct MoonshotClient {
-    api_key: String,
-    api_url: String,
-    client: HttpClient,
-}
-
-impl MoonshotClient {
-    pub fn new(config: &MoonshotConfig) -> Self {
-        let client = if config.proxy {
-            HttpClient::new()
-        } else {
-            HttpClient::builder()
-                .no_proxy()
-                .build()
-                .unwrap_or_else(|_| HttpClient::new())
-        };
-
-        Self {
-            api_key: config.api_key.clone(),
-            api_url: config.api_url.clone(),
-            client,
-        }
-    }
-}
-
-#[async_trait]
-impl ChatClient for MoonshotClient {
-    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
-        println!("===========self.api_url: {}", self.api_url);
-        println!("===========self.api_key: {}", self.api_key);
-        println!("{request:?}");
-        let response = self
-            .client
-            .post(&format!("{}/chat/completions", self.api_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            let error_text = response.text().await?;
-            println!("Received response: {}", error_text);
             return Err(eyre!("API Error: {}", error_text));
         }
         let text_data = response.text().await?;
@@ -247,5 +194,13 @@ impl ChatClient for DoraClient {
             .await?;
         rx.await
             .map_err(|e| eyre::eyre!("Failed to parse call tool result: {e}"))
+    }
+}
+
+fn get_env_or_value(value: &str) -> String {
+    if value.starts_with("env:") {
+        std::env::var(&value[4..]).unwrap_or_else(|_| value.to_string())
+    } else {
+        value.to_string()
     }
 }

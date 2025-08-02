@@ -11,7 +11,7 @@ use figment::Figment;
 use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
 use serde::{Deserialize, Serialize};
 
-use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient, MoonshotClient, OpenaiClient};
+use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient, OpenaiClient};
 use crate::{ChatSession, ServerEvent, ToolSet};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -85,7 +85,6 @@ pub enum ProviderConfig {
     Gemini(GeminiConfig),
     Deepseek(DeepseekConfig),
     Openai(OpenaiConfig),
-    Moonshot(MoonshotConfig),
     Dora(DoraConfig),
 }
 impl ProviderConfig {
@@ -94,7 +93,6 @@ impl ProviderConfig {
             ProviderConfig::Gemini(config) => &*config.id,
             ProviderConfig::Deepseek(config) => &*config.id,
             ProviderConfig::Openai(config) => &*config.id,
-            ProviderConfig::Moonshot(config) => &*config.id,
             ProviderConfig::Dora(config) => &*config.id,
         }
     }
@@ -151,26 +149,6 @@ fn default_openai_api_url() -> String {
     std::env::var("OPENAI_API_URL")
         .unwrap_or_else(|_| "https://api.openai.com/v1/chat/completions".to_owned())
 }
-
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct MoonshotConfig {
-    pub id: String,
-    #[serde(default = "default_moonshot_api_key")]
-    pub api_key: String,
-    #[serde(default = "default_moonshot_api_url")]
-    pub api_url: String,
-    #[serde(default)]
-    pub proxy: bool,
-}
-fn default_moonshot_api_key() -> String {
-    std::env::var("MOONSHOT_API_KEY").unwrap_or_default()
-}
-fn default_moonshot_api_url() -> String {
-    std::env::var("MOONSHOT_API_URL")
-        .unwrap_or_else(|_| "https://api.moonshot.cn/v1".to_owned())
-}
-
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DoraConfig {
@@ -285,7 +263,6 @@ impl Config {
                 ProviderConfig::Gemini(config) => Arc::new(GeminiClient::new(config)),
                 ProviderConfig::Deepseek(config) => Arc::new(DeepseekClient::new(config)),
                 ProviderConfig::Openai(config) => Arc::new(OpenaiClient::new(config)),
-                ProviderConfig::Moonshot(config) => Arc::new(MoonshotClient::new(config)),
                 ProviderConfig::Dora(config) => {
                     Arc::new(DoraClient::new(config, server_events_tx.clone()))
                 }
