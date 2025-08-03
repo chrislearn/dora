@@ -11,7 +11,7 @@ use std::env::var;
 use std::vec;
 
 use dora_node_api::arrow::array::AsArray;
-use dora_node_api::arrow::datatypes::{UInt16Type, UInt8Type};
+use dora_node_api::arrow::datatypes::{UInt8Type, UInt16Type};
 use dora_node_api::dora_core::config::DataId;
 use dora_node_api::{DoraNode, Event, IntoArrow, Metadata, MetadataParameters, Parameter};
 use eyre::{Context as EyreContext, Result};
@@ -76,7 +76,7 @@ fn metadata_to_exif(metadata: &MetadataParameters) -> Result<Vec<u8>> {
     }
 
     let vector = metadata_exif.as_u8_vec(little_exif::filetype::FileExtension::HEIF)?;
-    return Ok(vector);
+    Ok(vector)
 }
 
 fn bgr8_to_yuv420(bgr_data: Vec<u8>, width: usize, height: usize) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -490,9 +490,9 @@ pub fn lib_main() -> Result<()> {
 
 #[cfg(feature = "python")]
 use pyo3::{
-    pyfunction, pymodule,
+    Bound, PyResult, Python, pyfunction, pymodule,
     types::{PyModule, PyModuleMethods},
-    wrap_pyfunction, Bound, PyResult, Python,
+    wrap_pyfunction,
 };
 
 #[cfg(feature = "python")]

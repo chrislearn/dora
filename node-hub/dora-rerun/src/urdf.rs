@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use eyre::{Context, ContextCompat, Result};
-use k::{nalgebra::Quaternion, Chain, Translation3, UnitQuaternion};
+use k::{Chain, Translation3, UnitQuaternion, nalgebra::Quaternion};
 use rerun::{RecordingStream, Vec3D};
 pub struct MyIntersperse<T, I> {
     iterator: I,
@@ -82,22 +82,23 @@ pub fn init_urdf(rec: &RecordingStream) -> Result<HashMap<String, Chain<f32>>> {
             PathBuf::from(urdf_path)
         };
         let chain = k::Chain::<f32>::from_urdf_file(&urdf_path)
-            .context(format!("Could not load URDF {:#?}", urdf_path))?;
+            .context(format!("Could not load URDF {urdf_path:#?}"))?;
 
         let path = key.replace("_urdf", ".urdf").replace("_URDF", ".urdf");
         let transform = key.replace("_urdf", "_transform");
 
         if PathBuf::from(&urdf_path).file_name() != PathBuf::from(&path).file_name() {
             return Err(eyre::eyre!(
-                "URDF filename should be the same as the environment variable name and replacing the dot with a dash. Got {:#?} instead of {}", urdf_path, path
+                "URDF filename should be the same as the environment variable name and replacing the dot with a dash. Got {:#?} instead of {}",
+                urdf_path,
+                path
             ));
         }
         rec.log_file_from_path(&urdf_path, None, true)
             .context(format!(
-                "Could not log URDF file {:#?} within rerun-urdf-loader",
-                urdf_path
+                "Could not log URDF file {urdf_path:#?} within rerun-urdf-loader"
             ))?;
-        println!("Logging URDF file: {:#?}", urdf_path);
+        println!("Logging URDF file: {urdf_path:#?}");
 
         // Get transform by replacing URDF_ with TRANSFORM_
         if let Ok(transform) = std::env::var(transform) {

@@ -11,13 +11,13 @@ use dora_node_api::dora_core::config::NodeId;
 use dora_node_api::dora_core::descriptor::source_is_url;
 use dora_node_api::merged::{MergeExternalSend, MergedEvent};
 use dora_node_api::{DataflowId, DoraNode, EventStream};
-use dora_operator_api_python::{pydict_to_metadata, DelayedCleanup, NodeCleanupHandle, PyEvent};
+use dora_operator_api_python::{DelayedCleanup, NodeCleanupHandle, PyEvent, pydict_to_metadata};
 use dora_ros2_bridge_python::Ros2Subscription;
 use eyre::Context;
 use futures::{Stream, StreamExt};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
-/// use pyo3_special_method_derive::{Dict, Dir, Repr, Str};
+use pyo3_special_method_derive::{Dict, Dir, Repr, Str};
 
 /// The custom node API lets you integrate `dora` into your application.
 /// It allows you to retrieve input and send output in any fashion you want.
@@ -32,7 +32,7 @@ use pyo3::types::{PyBytes, PyDict};
 ///
 /// :type node_id: str, optional
 #[pyclass]
-/// #[derive(Dir, Dict, Str, Repr)]
+#[derive(Dir, Dict, Str, Repr)]
 pub struct Node {
     events: Events,
     node: DelayedCleanup<DoraNode>,
@@ -320,6 +320,7 @@ impl Events {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum EventsInner {
     Dora(EventStream),
     Merged(Box<dyn Stream<Item = MergedEvent<PyObject>> + Unpin + Send + Sync>),
