@@ -7,18 +7,20 @@ use dora_node_api::{
     DoraNode, Event, MetadataParameters, Parameter,
 };
 use eyre::{Context, ContextCompat};
-
 use futures::channel::oneshot;
+use outfox_openai::spec::{
+    ChatChoice, ChatCompletionRequestMessage, ChatCompletionRequestUserMessageContent,
+    ChatCompletionRequestUserMessageContentPart, ChatCompletionResponseMessage, CompletionUsage,
+    CreateChatCompletionRequest, CreateChatCompletionResponse, FinishReason, Role,
+};
 use salvo::cors::*;
 use salvo::prelude::*;
 use tokio::sync::mpsc;
 
 mod client;
-mod models;
+mod error;
 mod routing;
 mod utils;
-use models::*;
-mod error;
 use error::AppError;
 mod config;
 mod session;
@@ -44,13 +46,16 @@ async fn main() -> eyre::Result<()> {
 
     let mut reply_channels: HashMap<
         String,
-        (oneshot::Sender<ChatCompletionResponse>, u64, Option<String>),
+        (
+            oneshot::Sender<CreateChatCompletionResponse>,
+            u32,
+            Option<String>,
+        ),
     > = HashMap::new();
 
     let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn(async move {
-        let service = Service::new(routing::root(
-                config.endpoint.clone(), chat_session.into()))
+        let service = Service::new(routing::root(config.endpoint.clone(), chat_session.into()))
             .hoop(
                 Cors::new()
                     .allow_origin(AllowOrigin::any())
@@ -84,11 +89,19 @@ async fn main() -> eyre::Result<()> {
                     let mut metadata = MetadataParameters::default();
                     let call_id = gen_call_id();
                     metadata.insert("__dora_call_id".into(), Parameter::String(call_id.clone()));
-                    let texts = request.to_texts();
-                    node.send_output(DataId::from(output), Default::default(), StringArray::from(texts))
-                        .context("failed to send dora output")?;
+                    let texts = request
+                        .messages
+                        .iter()
+                        .map(|msg| msg.to_texts().join("\n"))
+                        .collect::<Vec<_>>();
+                    node.send_output(
+                        DataId::from(output),
+                        Default::default(),
+                        StringArray::from(texts),
+                    )
+                    .context("failed to send dora output")?;
 
-                    reply_channels.insert(call_id, (reply, 0_u64, request.model));
+                    reply_channels.insert(call_id, (reply, 0_u32, Some(request.model)));
                 }
             },
             MergedEvent::Dora(event) => match event {
@@ -110,26 +123,32 @@ async fn main() -> eyre::Result<()> {
                         acc
                     });
 
-                    let data = ChatCompletionResponse {
+                    let data = CreateChatCompletionResponse {
                         id: format!("completion-{}", uuid::Uuid::new_v4()),
                         object: "chat.completion".to_string(),
-                        created: chrono::Utc::now().timestamp() as u64,
+                        created: chrono::Utc::now().timestamp() as u32,
                         model: model.unwrap_or_default(),
-                        usage: Usage {
+                        usage: Some(CompletionUsage {
                             prompt_tokens,
-                            completion_tokens: data.len() as u64,
-                            total_tokens: prompt_tokens + data.len() as u64,
-                        },
-                        choices: vec![ChatCompletionResponseChoice {
+                            completion_tokens: data.len() as u32,
+                            total_tokens: prompt_tokens + data.len() as u32,
+                            prompt_tokens_details: None,
+                            completion_tokens_details: None,
+                        }),
+                        choices: vec![ChatChoice {
                             index: 0,
-                            message: ChatCompletionMessage {
-                                role: ChatCompletionRole::Assistant.to_string(),
-                                content: ChatCompletionContent::new_text(data),
+                            message: ChatCompletionResponseMessage {
+                                role: Role::Assistant,
+                                content: Some(data),
                                 tool_calls: None,
+                                audio: None,
+                                refusal: None,
                             },
-                            finish_reason: FinishReason::stop,
+                            finish_reason: Some(FinishReason::Stop),
                             logprobs: None,
                         }],
+                        service_tier: None,
+                        system_fingerprint: None,
                     };
 
                     if reply_channel.send(data).is_err() {
@@ -158,7 +177,7 @@ enum ServerEvent {
     Result(eyre::Result<()>),
     CallNode {
         output: String,
-        request: ChatCompletionRequest,
-        reply: oneshot::Sender<ChatCompletionResponse>,
+        request: CreateChatCompletionRequest,
+        reply: oneshot::Sender<CreateChatCompletionResponse>,
     },
 }

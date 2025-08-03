@@ -90,10 +90,11 @@ if __name__ == "__main__":
     # test_list_models()
     print("\n" + "=" * 50 + "\n")
 
-    chat_input = input("Enter a message for chat completion: ")
-    test_chat_completion(chat_input)
+    while True:
+        chat_input = input("Enter a message for chat completion: ")
+        test_chat_completion(chat_input)
 
-    print("\n" + "=" * 50 + "\n")
+        print("\n" + "=" * 50 + "\n")
 
     # test_chat_completion_image_url(chat_input)
     # print("\n" + "=" * 50 + "\n")

@@ -38,9 +38,9 @@ route = { provider = "moonshot", model = "kimi-latest" }
 id = "gemini-2.0-flash"
 route = { provider = "gemini", model = "gemini-2.0-flash" }
 
-
-# [[mcp_servers]]
-# name = "MCP server name"
-# protocol = "stdio"
-# command = "MCP server path"
-# args = [" "]
+[[mcp.servers]]
+name = "amap-maps"
+protocol = "stdio"
+command = "npx"
+args = ["-y", "@amap/amap-maps-mcp-server"]
+envs = {AMAP_MAPS_API_KEY = "7a5963d8d02618dd6ffeebd32edecea9"}

@@ -2,20 +2,24 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use eyre::Result;
+use outfox_openai::spec::{
+    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
+    ChatCompletionRequestUserMessage, ChatCompletionRequestUserMessageContent,
+    ChatCompletionResponseMessage, ChatCompletionTool, ChatCompletionToolType,
+    CreateChatCompletionRequest, CreateChatCompletionResponse, FunctionCall, FunctionObject,
+    PartibleTextContent, Role,
+};
 use serde_json;
 
 use crate::client::ChatClient;
 use crate::config::ModelConfig;
-use crate::{
-    models::{ChatCompletionMessage, ChatCompletionRequest, ChatCompletionResponse, ToolFunction},
-    tool::{Tool as ToolTrait, ToolSet},
-};
+use crate::tool::{Tool as ToolTrait, ToolSet};
 
 pub struct ChatSession {
     pub chat_clients: HashMap<String, Arc<dyn ChatClient>>,
     pub models: Vec<ModelConfig>,
     pub tool_set: ToolSet,
-    pub messages: Mutex<Vec<ChatCompletionMessage>>,
+    pub messages: Mutex<Vec<ChatCompletionRequestMessage>>,
 }
 
 impl ChatSession {
@@ -57,24 +61,30 @@ impl ChatSession {
 
     pub fn add_system_prompt(&mut self, prompt: impl ToString) {
         let mut messages = self.messages.lock().expect("messages should locked");
-        messages.push(ChatCompletionMessage::system(prompt));
+        messages.push(
+            ChatCompletionRequestSystemMessage {
+                content: PartibleTextContent::Text(prompt.to_string()),
+                name: None,
+            }
+            .into(),
+        );
     }
 
     pub fn get_tools(&self) -> Vec<Arc<dyn ToolTrait>> {
         self.tool_set.tools()
     }
 
-    pub async fn analyze_tool_call(&self, response: &ChatCompletionMessage) {
+    pub async fn analyze_tool_call(&self, response: &ChatCompletionResponseMessage) {
         let mut tool_calls_func = Vec::new();
         if let Some(tool_calls) = response.tool_calls.as_ref() {
             for tool_call in tool_calls {
-                if tool_call.ty == "function" {
-                    tool_calls_func.push(tool_call.function.clone());
-                }
+                // if tool_call.r#type == "function" {
+                tool_calls_func.push(tool_call.function.clone());
+                // }
             }
         } else {
             // check if message contains tool call
-            for text in response.content.to_texts() {
+            if let Some(text) = &response.content {
                 if text.contains("Tool:") {
                     let lines: Vec<&str> = text.split('\n').collect();
                     // simple parse tool call
@@ -93,7 +103,7 @@ impl ChatSession {
                         }
                     }
                     if let Some(name) = tool_name {
-                        tool_calls_func.push(ToolFunction {
+                        tool_calls_func.push(FunctionCall {
                             name,
                             arguments: args_text.join("\n"),
                         });
@@ -103,7 +113,6 @@ impl ChatSession {
         }
         // call tool
         for tool_call in tool_calls_func {
-            println!("tool call: {:?}", tool_call);
             let tool = self.tool_set.get_tool(&tool_call.name);
             if let Some(tool) = tool {
                 // call tool
@@ -114,36 +123,60 @@ impl ChatSession {
                         if result.is_error.is_some_and(|b| b) {
                             let mut messages =
                                 self.messages.lock().expect("messages should locked");
-                            messages.push(ChatCompletionMessage::user(
-                                "tool call failed, mcp call error",
-                            ));
+                            messages.push(
+                                ChatCompletionRequestUserMessage::new(
+                                    "tool call failed, mcp call error",
+                                )
+                                .into(),
+                            );
                         } else {
-                            result.content.iter().for_each(|content| {
-                                if let Some(content_text) = content.as_text() {
-                                    let json_result = serde_json::from_str::<serde_json::Value>(
-                                        &content_text.text,
+                            if result.is_error.is_some_and(|b| b) {
+                                let mut messages =
+                                    self.messages.lock().expect("messages should locked");
+                                messages.push(
+                                    ChatCompletionRequestUserMessage::new(
+                                        "tool call failed, mcp call error",
                                     )
-                                    .unwrap_or_default();
-                                    let pretty_result =
-                                        serde_json::to_string_pretty(&json_result).unwrap();
-                                    println!("call tool result: {}", pretty_result);
-                                    let mut messages =
-                                        self.messages.lock().expect("messages should locked");
-                                    messages.push(ChatCompletionMessage::user(format!(
-                                        "call tool result: {}",
-                                        pretty_result
-                                    )));
-                                }
-                            });
+                                    .into(),
+                                );
+                            } else if let Some(contents) = &result.content {
+                                contents.iter().for_each(|content| {
+                                    if let Some(content_text) = content.as_text() {
+                                        let json_result =
+                                            serde_json::from_str::<serde_json::Value>(
+                                                &content_text.text,
+                                            )
+                                            .unwrap_or_default();
+                                        let pretty_result =
+                                            serde_json::to_string_pretty(&json_result).unwrap();
+                                        println!("call tool result: {}", pretty_result);
+                                        let mut messages =
+                                            self.messages.lock().expect("messages should locked");
+                                        messages.push(
+                                            ChatCompletionRequestUserMessage::new(format!(
+                                                "call tool result: {}",
+                                                pretty_result
+                                            ))
+                                            .into(),
+                                        );
+                                    }
+                                });
+                            }
                         }
                     }
                     Err(e) => {
                         println!("tool call failed: {}", e);
                         let mut messages = self.messages.lock().expect("messages should locked");
-                        messages.push(ChatCompletionMessage::user(format!(
-                            "tool call failed: {}",
-                            e
-                        )));
+                        messages.push(
+                            ChatCompletionRequestUserMessage {
+                                content: ChatCompletionRequestUserMessageContent::Text(format!(
+                                    "tool call failed: {}",
+                                    e
+                                )),
+                                name: None,
+                            }
+                            .into(),
+                        );
                     }
                 }
             } else {
@@ -151,7 +184,10 @@ impl ChatSession {
             }
         }
     }
-    pub async fn chat(&self, mut request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+    pub async fn chat(
+        &self,
+        mut request: CreateChatCompletionRequest,
+    ) -> Result<CreateChatCompletionResponse> {
         {
             let mut messages = self.messages.lock().expect("messages should locked");
             for message in std::mem::take(&mut request.messages) {
@@ -164,10 +200,14 @@ impl ChatSession {
             Some(
                 tools
                     .iter()
-                    .map(|tool| crate::models::ToolInfo {
-                        name: tool.name(),
-                        description: tool.description(),
-                        parameters: tool.parameters(),
+                    .map(|tool| ChatCompletionTool {
+                        kind: ChatCompletionToolType::Function,
+                        function: FunctionObject {
+                            name: tool.name(),
+                            description: Some(tool.description()),
+                            parameters: Some(tool.parameters()),
+                            strict: None,
+                        },
                     })
                     .collect(),
             )
@@ -175,23 +215,23 @@ impl ChatSession {
             None
         };
 
-        let model = request.model.as_deref().unwrap_or_else(|| {
-            self.default_model()
-                .expect("No default model found, please set a default model in the config")
-        });
-        let (client, model) = self.route(model).expect("failed to route model");
-        request.model = Some(model);
+        let (client, model) = self.route(&request.model).expect("failed to route model");
+        request.model = model.clone();
         request.tools = tool_definitions;
 
         // send request
         let response = client.complete(request).await?;
         // get choice
         if let Some(choice) = response.choices.first() {
-            println!("AI > {:#?}", choice.message.to_texts());
             // analyze tool call
             self.analyze_tool_call(&choice.message).await;
+            let request = {
+                let messages = self.messages.lock().expect("messages should locked");
+                CreateChatCompletionRequest::new(model, messages.clone())
+            };
+            client.complete(request).await
+        } else {
+            Ok(response)
         }
-
-        Ok(response)
     }
 }

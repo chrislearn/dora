@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use salvo::prelude::*;
+use outfox_openai::spec::{CreateChatCompletionRequest, CreateChatCompletionResponse, Model};
 
-use crate::models::*;
 use crate::session::ChatSession;
 use crate::AppResult;
 
@@ -66,7 +66,7 @@ async fn chat_completions(
 
     tracing::info!("Prepare the chat completion request.");
 
-    let mut chat_request = match req.parse_json::<ChatCompletionRequest>().await {
+    let mut chat_request = match req.parse_json::<CreateChatCompletionRequest>().await {
         Ok(chat_requst) => chat_requst,
         Err(e) => {
             println!(
@@ -85,7 +85,7 @@ async fn chat_completions(
 
     // log user id
     tracing::info!("user: {}", chat_request.user.clone().unwrap());
-    let stream = chat_request.stream;
+    // let stream = chat_request.stream;
 
     // let (tx, rx) = oneshot::channel();
     // request_tx

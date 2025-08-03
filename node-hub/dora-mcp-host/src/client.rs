@@ -1,18 +1,21 @@
 use figment::value;
 use tokio::sync::mpsc;
 
+use outfox_openai::spec::{CreateChatCompletionRequest, CreateChatCompletionResponse};
 use eyre::{eyre, Result};
 use futures::channel::oneshot;
 use reqwest::Client as HttpClient;
 use salvo::async_trait;
 
 use crate::config::{DeepseekConfig, DoraConfig, GeminiConfig, OpenaiConfig};
-use crate::models::{ChatCompletionRequest, ChatCompletionResponse};
-use crate::ServerEvent;
+use crate::{utils::get_env_or_value, ServerEvent};
 
 #[async_trait]
 pub trait ChatClient: Send + Sync {
-    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse>;
+    async fn complete(
+        &self,
+        request: CreateChatCompletionRequest,
+    ) -> Result<CreateChatCompletionResponse>;
 }
 
 #[derive(Debug)]
@@ -43,7 +46,10 @@ impl GeminiClient {
 
 #[async_trait]
 impl ChatClient for GeminiClient {
-    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+    async fn complete(
+        &self,
+        request: CreateChatCompletionRequest,
+    ) -> Result<CreateChatCompletionResponse> {
         let response = self
             .client
             .post(&self.api_url)
@@ -59,7 +65,7 @@ impl ChatClient for GeminiClient {
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
-        let completion: ChatCompletionResponse = serde_json::from_str(&text_data)
+        let completion: CreateChatCompletionResponse = serde_json::from_str(&text_data)
             .map_err(eyre::Report::from)
             .unwrap();
         Ok(completion)
@@ -94,7 +100,10 @@ impl DeepseekClient {
 
 #[async_trait]
 impl ChatClient for DeepseekClient {
-    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+    async fn complete(
+        &self,
+        request: CreateChatCompletionRequest,
+    ) -> Result<CreateChatCompletionResponse> {
         let response = self
             .client
             .post(&format!("{}/chat/completions", self.api_url))
@@ -110,7 +119,7 @@ impl ChatClient for DeepseekClient {
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
-        let completion: ChatCompletionResponse =
+        let completion: CreateChatCompletionResponse =
             serde_json::from_str(&text_data).map_err(eyre::Report::from)?;
         Ok(completion)
     }
@@ -144,7 +153,7 @@ impl OpenaiClient {
 
 #[async_trait]
 impl ChatClient for OpenaiClient {
-    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+    async fn complete(&self, request: CreateChatCompletionRequest) -> Result<CreateChatCompletionResponse> {
         let response = self
             .client
             .post(&format!("{}/chat/completions", self.api_url))
@@ -160,7 +169,7 @@ impl ChatClient for OpenaiClient {
         }
         let text_data = response.text().await?;
         println!("Received response: {}", text_data);
-        let completion: ChatCompletionResponse =
+        let completion: CreateChatCompletionResponse =
             serde_json::from_str(&text_data).map_err(eyre::Report::from)?;
         Ok(completion)
     }
@@ -183,7 +192,7 @@ impl DoraClient {
 
 #[async_trait]
 impl ChatClient for DoraClient {
-    async fn complete(&self, request: ChatCompletionRequest) -> Result<ChatCompletionResponse> {
+    async fn complete(&self, request: CreateChatCompletionRequest) -> Result<CreateChatCompletionResponse> {
         let (tx, rx) = oneshot::channel();
         self.event_sender
             .send(ServerEvent::CallNode {
@@ -194,13 +203,5 @@ impl ChatClient for DoraClient {
             .await?;
         rx.await
             .map_err(|e| eyre::eyre!("Failed to parse call tool result: {e}"))
-    }
-}
-
-fn get_env_or_value(value: &str) -> String {
-    if value.starts_with("env:") {
-        std::env::var(&value[4..]).unwrap_or_else(|_| value.to_string())
-    } else {
-        value.to_string()
     }
 }

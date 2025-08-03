@@ -2,8 +2,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use eyre::Result;
 use rmcp::{
+    RoleClient,
     model::{CallToolRequestParam, CallToolResult, Tool as McpTool},
-    service::ServerSink,
+    service::{RunningService, ServerSink},
 };
 use salvo::async_trait;
 use serde_json::Value;
@@ -50,7 +51,6 @@ impl Tool for McpToolAdapter {
             Value::Object(map) => Some(map),
             _ => None,
         };
-        println!("arguments: {:?}", arguments);
         let call_result = self
             .server
             .call_tool(CallToolRequestParam {
@@ -65,9 +65,14 @@ impl Tool for McpToolAdapter {
 #[derive(Default)]
 pub struct ToolSet {
     tools: HashMap<String, Arc<dyn Tool>>,
+    clients: HashMap<String, RunningService<RoleClient, ()>>,
 }
 
 impl ToolSet {
+    pub fn set_clients(&mut self, clients: HashMap<String, RunningService<RoleClient, ()>>) {
+        self.clients = clients;
+    }
+
     pub fn add_tool<T: Tool + 'static>(&mut self, tool: T) {
         self.tools.insert(tool.name(), Arc::new(tool));
     }
