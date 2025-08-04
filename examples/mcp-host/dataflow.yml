@@ -4,8 +4,10 @@ nodes:
     path: ../../target/release/dora-mcp-server
     outputs:
       - local
+      - telepathy
     inputs:
       local_reply: local/reply
+      telepathy_reply: telepathy/reply
     env:
       CONFIG: mcp_server.toml
 
@@ -13,6 +15,13 @@ nodes:
     path: nodes/local.py
     inputs:
       text: mcp-server/local
+    outputs:
+      - reply
+
+  - id: telepathy
+    path: nodes/telepathy.py
+    inputs:
+      text: mcp-server/telepathy
     outputs:
       - reply
 
