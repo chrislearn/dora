@@ -13,11 +13,11 @@ kind ="gemini"
 # api_key = "AIzaSyC_kTTfK6C-737Xn10or9RdwkKCqAnioR8"
 api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
-[[providers]]
-id = "deepseek"
-kind ="deepseek"
-# api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
-api_url = "https://api.deepseek.com"
+# [[providers]]
+# id = "deepseek"
+# kind ="deepseek"
+# # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+# api_url = "https://api.deepseek.com"
 
 # [[providers]]
 # id = "openai"

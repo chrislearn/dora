@@ -1,0 +1,19 @@
+name = "MCP Server Example"
+version = "0.1.0"
+
+# You can set your custom listen address and endpoint here.
+# Default listen address is "0.0.0.0:8008" and endpoint is "mcp".
+listen_addr = "0.0.0.0:8228"
+endpoint = "mcp"
+
+[[mcp_tools]]
+name = "delicious_food"
+args = []
+input_schema = "local_object.json"
+node_id = "local"
+
+[[mcp_tools]]
+name = "tallest_building"
+args = []
+input_schema = "local_object.json"
+node_id = "local"

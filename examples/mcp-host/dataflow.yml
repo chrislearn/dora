@@ -7,7 +7,7 @@ nodes:
     inputs:
       text: dora-echo/echo
     env:
-      CONFIG: config.toml
+      CONFIG: mcp_host.toml
 
   - id: dora-echo
     build: pip install -e ../../node-hub/dora-echo
@@ -16,3 +16,20 @@ nodes:
       echo: dora-mcp-host/text
     outputs:
       - echo
+
+  - id: mcp-server
+    build: cargo build -p dora-mcp-server --release
+    path: ../../target/release/dora-mcp-server
+    outputs:
+      - counter
+    inputs:
+      counter_reply: counter/reply
+    env:
+      MCP_SERVER_CONFIG: mcp_server.toml
+
+  - id: counter
+    path: nodes/counter.py
+    inputs:
+      text: mcp-server/counter
+    outputs:
+      - reply
