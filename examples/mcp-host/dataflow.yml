@@ -1,13 +1,20 @@
 nodes:
-  - id: dora-mcp-host
-    build: cargo build -p dora-mcp-host --release
-    path: ../../target/release/dora-mcp-host
+  - id: mcp-server
+    build: cargo build -p dora-mcp-server --release
+    path: ../../target/release/dora-mcp-server
     outputs:
-      - text
+      - local
     inputs:
-      text: dora-echo/echo
+      local_reply: local/reply
     env:
-      CONFIG: mcp_host.toml
+      CONFIG: mcp_server.toml
+
+  - id: local
+    path: nodes/local.py
+    inputs:
+      text: mcp-server/local
+    outputs:
+      - reply
 
   - id: dora-echo
     build: pip install -e ../../node-hub/dora-echo
@@ -17,19 +24,12 @@ nodes:
     outputs:
       - echo
 
-  - id: mcp-server
-    build: cargo build -p dora-mcp-server --release
-    path: ../../target/release/dora-mcp-server
+  - id: dora-mcp-host
+    build: cargo build -p dora-mcp-host --release
+    path: ../../target/release/dora-mcp-host
     outputs:
-      - counter
+      - text
     inputs:
-      counter_reply: counter/reply
+      text: dora-echo/echo
     env:
-      MCP_SERVER_CONFIG: mcp_server.toml
-
-  - id: counter
-    path: nodes/counter.py
-    inputs:
-      text: mcp-server/counter
-    outputs:
-      - reply
+      CONFIG: mcp_host.toml

@@ -7,13 +7,13 @@ use std::{
 };
 use tokio::sync::mpsc;
 
-use figment::providers::{Env, Format, Json, Toml, Yaml};
 use figment::Figment;
-use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
+use figment::providers::{Env, Format, Json, Toml, Yaml};
+use rmcp::{RoleClient, ServiceExt, service::RunningService, transport::ConfigureCommandExt};
 use serde::{Deserialize, Serialize};
 
 use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient, OpenaiClient};
-use crate::{utils::get_env_or_value, ChatSession, ServerEvent, ToolSet};
+use crate::{ChatSession, ServerEvent, ToolSet, utils::get_env_or_value};
 
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
 
@@ -210,9 +210,18 @@ impl McpServerTransportConfig {
     pub async fn start(&self) -> eyre::Result<RunningService<RoleClient, ()>> {
         let client = match self {
             McpServerTransportConfig::Streamable { url } => {
-                let transport =
-                    rmcp::transport::StreamableHttpClientTransport::from_uri(url.to_string());
-                ().serve(transport).await?
+                for _ in 0..3 {
+                    let transport =
+                        rmcp::transport::StreamableHttpClientTransport::from_uri(url.to_string());
+                    match ().serve(transport).await {
+                        Ok(client) => return Ok(client),
+                        Err(e) => {
+                            tracing::warn!("failed to start streamable transport: {e}");
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        }
+                    }
+                }
+                eyre::bail!("failed to start streamable transport after 3 attempts");
             }
             McpServerTransportConfig::Sse { url } => {
                 let transport =
@@ -286,7 +295,7 @@ impl Config {
             for (name, client) in mcp_clients.iter() {
                 println!("load MCP tool: {}", name);
                 let server = client.peer().clone();
-                let tools = crate::get_mcp_tools(server).await?;
+                let tools = crate::get_mcp_tools(server.clone()).await?;
 
                 for tool in tools {
                     tool_set.add_tool(tool);

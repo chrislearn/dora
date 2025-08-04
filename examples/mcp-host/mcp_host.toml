@@ -44,3 +44,8 @@ protocol = "stdio"
 command = "npx"
 args = ["-y", "@amap/amap-maps-mcp-server"]
 envs = {AMAP_MAPS_API_KEY = "7a5963d8d02618dd6ffeebd32edecea9"}
+
+[[mcp.servers]]
+name = "local"
+protocol = "streamable"
+url = "http://127.0.0.1:8228/mcp"
