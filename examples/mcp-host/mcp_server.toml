@@ -7,15 +7,22 @@ listen_addr = "0.0.0.0:8228"
 endpoint = "mcp"
 
 [[mcp_tools]]
-name = "delicious_food"
-description = "Tell you the best delicious food in this location"
+name = "best_restaurant"
+description = "TTell me the best restaurant in this location and how many people in this restaurant."
 args = []
 input_schema = "local_object.json"
 output = "local"
 
 [[mcp_tools]]
 name = "tallest_building"
-description = "Tell you the tallest building in this location"
+description = "Tell you the tallest building in this location and how many people in this building."
+args = []
+input_schema = "local_object.json"
+output = "local"
+
+[[mcp_tools]]
+name = "happiest_kindergarten"
+description = "Tell you the happiest kindergarten in this location and how many children are in this kindergarten."
 args = []
 input_schema = "local_object.json"
 output = "local"

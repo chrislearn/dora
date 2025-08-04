@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use futures::channel::oneshot;
-use rmcp::model::JsonRpcRequest;
 use rmcp::model::{
-    CallToolResult, EmptyResult, Implementation, InitializeResult, JsonObject, ListToolsResult,
-    ProtocolVersion, Request, ServerCapabilities, ServerResult, Tool,
+    CallToolRequest, CallToolResult, EmptyResult, Implementation, InitializeResult, JsonObject,
+    ListToolsResult, ProtocolVersion, Request, ServerCapabilities, ServerResult, Tool,
 };
+use rmcp::model::{ClientRequest, JsonRpcRequest};
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
@@ -79,26 +79,20 @@ impl McpServer {
 
     pub async fn handle_tools_call(
         &self,
-        params: JsonObject,
+        request: CallToolRequest,
         request_tx: &mpsc::Sender<ServerEvent>,
     ) -> eyre::Result<CallToolResult> {
         let (tx, rx) = oneshot::channel();
 
-        let Some(name) = params.get("name") else {
-            return Err(eyre::eyre!("Tool name is required in parameters"));
-        };
-        let name = name
-            .as_str()
-            .ok_or_else(|| eyre::eyre!("Tool name must be a string"))?;
         let tool = self
             .tools
             .iter()
-            .find(|t| t.inner.name == name)
-            .ok_or_else(|| eyre::eyre!("Tool not found: {}", name))?;
+            .find(|t| t.inner.name == request.params.name)
+            .ok_or_else(|| eyre::eyre!("Tool not found: {}", request.params.name))?;
         request_tx
             .send(ServerEvent::CallNode {
                 output: tool.output.clone(),
-                data: serde_json::to_string(&params).unwrap(),
+                data: serde_json::to_string(&request.params).unwrap(),
                 reply: tx,
             })
             .await?;
@@ -110,22 +104,23 @@ impl McpServer {
 
     pub async fn handle_request(
         &self,
-        rpc_request: JsonRpcRequest,
+        rpc_request: JsonRpcRequest<ClientRequest>,
         server_events_tx: &mpsc::Sender<ServerEvent>,
     ) -> eyre::Result<ServerResult> {
-        let Request { method, params, .. } = rpc_request.request;
-        match method.as_str() {
-            "ping" => self.handle_ping().await.map(ServerResult::EmptyResult),
-            "initialize" => self
+        match rpc_request.request {
+            ClientRequest::PingRequest(_request) => {
+                self.handle_ping().await.map(ServerResult::EmptyResult)
+            }
+            ClientRequest::InitializeRequest(_request) => self
                 .handle_initialize()
                 .await
                 .map(ServerResult::InitializeResult),
-            "tools/list" => self
+            ClientRequest::ListToolsRequest(_request) => self
                 .handle_tools_list()
                 .await
                 .map(ServerResult::ListToolsResult),
-            "tools/call" => self
-                .handle_tools_call(params, server_events_tx)
+            ClientRequest::CallToolRequest(request) => self
+                .handle_tools_call(request, server_events_tx)
                 .await
                 .map(ServerResult::CallToolResult),
             method => Err(eyre::eyre!("unexpected method: {:#?}", method)),

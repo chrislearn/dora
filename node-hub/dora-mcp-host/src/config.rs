@@ -210,18 +210,19 @@ impl McpServerTransportConfig {
     pub async fn start(&self) -> eyre::Result<RunningService<RoleClient, ()>> {
         let client = match self {
             McpServerTransportConfig::Streamable { url } => {
-                for _ in 0..3 {
+                for _ in 0..5 {
                     let transport =
                         rmcp::transport::StreamableHttpClientTransport::from_uri(url.to_string());
                     match ().serve(transport).await {
                         Ok(client) => return Ok(client),
                         Err(e) => {
+                            println!("failed to start streamable transport: {e}");
                             tracing::warn!("failed to start streamable transport: {e}");
                             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                         }
                     }
                 }
-                eyre::bail!("failed to start streamable transport after 3 attempts");
+                eyre::bail!("failed to start streamable transport after 5 attempts");
             }
             McpServerTransportConfig::Sse { url } => {
                 let transport =

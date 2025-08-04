@@ -2,15 +2,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dora_node_api::{
+    DoraNode, Event, MetadataParameters, Parameter,
     arrow::array::{AsArray, StringArray},
     dora_core::config::DataId,
     merged::{MergeExternalSend, MergedEvent},
-    DoraNode, Event, MetadataParameters, Parameter,
 };
 
 use eyre::{Context, ContextCompat};
 use futures::channel::oneshot;
-use rmcp::model::JsonRpcRequest;
+use rmcp::model::{ClientRequest, JsonRpcRequest};
 use salvo::cors::*;
 use salvo::prelude::*;
 use tokio::sync::mpsc;
@@ -31,8 +31,6 @@ pub type AppResult<T> = Result<T, crate::AppError>;
 async fn main() -> eyre::Result<()> {
     config::init();
 
-    let (mut node, events) = DoraNode::init_from_env()?;
-
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
@@ -41,6 +39,7 @@ async fn main() -> eyre::Result<()> {
     let config = config::get();
     let mcp_server = Arc::new(McpServer::new(config));
 
+    salvo::http::request::set_global_secure_max_size(8_000_000); // set max size to 8MB
     let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn({
         let server_events_tx = server_events_tx.clone();
@@ -65,6 +64,7 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
+    let (mut node, events) = DoraNode::init_from_env()?;
     let merged = events.merge_external_send(server_events);
     let events = futures::executor::block_on_stream(merged);
 
@@ -108,8 +108,9 @@ async fn main() -> eyre::Result<()> {
                                 },
                             );
 
-                            let request = serde_json::from_str::<JsonRpcRequest>(&data)
-                                .context("failed to parse call tool from string")?;
+                            let request =
+                                serde_json::from_str::<JsonRpcRequest<ClientRequest>>(&data)
+                                    .context("failed to parse call tool from string")?;
 
                             if let Ok(result) =
                                 mcp_server.handle_request(request, &server_events_tx).await
@@ -117,9 +118,9 @@ async fn main() -> eyre::Result<()> {
                                 node.send_output(
                                     DataId::from("response".to_owned()),
                                     metadata.parameters,
-                                    StringArray::from(
-                                        vec![serde_json::to_string(&result).unwrap()],
-                                    ),
+                                    StringArray::from(vec![
+                                        serde_json::to_string(&result).unwrap(),
+                                    ]),
                                 )
                                 .context("failed to send dora output")?;
                             }
