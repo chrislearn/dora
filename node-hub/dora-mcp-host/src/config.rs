@@ -6,9 +6,9 @@ use std::{
 };
 use tokio::sync::mpsc;
 
-use figment::providers::{Env, Format, Json, Toml, Yaml};
 use figment::Figment;
-use rmcp::{service::RunningService, transport::ConfigureCommandExt, RoleClient, ServiceExt};
+use figment::providers::{Env, Format, Json, Toml, Yaml};
+use rmcp::{RoleClient, ServiceExt, service::RunningService, transport::ConfigureCommandExt};
 use serde::{Deserialize, Serialize};
 
 use crate::client::{ChatClient, DeepseekClient, DoraClient, GeminiClient, OpenaiClient};
