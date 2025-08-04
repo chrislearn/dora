@@ -35,7 +35,6 @@ pub type AppResult<T> = Result<T, AppError>;
 async fn main() -> eyre::Result<()> {
     config::init();
 
-    println!("SSSSSSSSSSSStart mcp host");
     let (server_events_tx, server_events_rx) = mpsc::channel(3);
     let server_events = tokio_stream::wrappers::ReceiverStream::new(server_events_rx);
 
@@ -54,7 +53,6 @@ async fn main() -> eyre::Result<()> {
         ),
     > = HashMap::new();
 
-    println!("SSSSSSSSSSSStart mcp host 0");
     let acceptor = TcpListener::new(&config.listen_addr).bind().await;
     tokio::spawn(async move {
         let service = Service::new(routing::root(config.endpoint.clone(), chat_session.into()))

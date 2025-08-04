@@ -43,7 +43,6 @@ async fn handle_post(req: &mut Request, depot: &mut Depot, res: &mut Response) -
 
     let value =
         String::from_utf8(req.payload().await?.to_vec()).context("failed to read request body")?;
-    println!("===========value: {value}");
     let rpc_message = serde_json::from_slice::<ClientJsonRpcMessage>(req.payload().await?)
         .context("failed to parse request bodyxxx")?;
     match rpc_message {
