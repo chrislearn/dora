@@ -10,7 +10,6 @@ from dora import Node
 import json
 import random
 
-# 演员和电影数组
 star_movie_pairs = [
     {"star": "Tom Hanks", "movie": "Forrest Gump"},
     {"star": "Leonardo DiCaprio", "movie": "Titanic"},
@@ -39,7 +38,6 @@ for event in node:
             location = data.get("arguments", {}).get("location", "")
             match name:
                 case "telepathy":
-                    # 随机选择一个演员和电影
                     random_pair = random.choice(star_movie_pairs)
                     star = random_pair["star"]
                     movie = random_pair["movie"]
