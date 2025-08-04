@@ -66,18 +66,21 @@ fn default_endpoint() -> Option<String> {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct McpToolConfig {
-    /// The name of the tool
+    /// Unique identifier for the tool
     pub name: String,
-    /// A description of what the tool does
+    /// Optional human-readable name of the tool for display purposes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Human-readable description of functionality
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// A JSON Schema object defining the expected parameters for the tool
     pub input_schema: InputSchema,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Optional additional tool information.
+    /// Optional properties describing tool behavior
     pub annotations: Option<ToolAnnotations>,
 
-    pub node_id: String,
+    pub output: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

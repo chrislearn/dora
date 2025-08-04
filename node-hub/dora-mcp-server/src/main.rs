@@ -25,7 +25,7 @@ mod utils;
 use config::Config;
 use utils::gen_call_id;
 
-pub type AppResult<T> = Result<T, AppError>;
+pub type AppResult<T> = Result<T, crate::AppError>;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -46,7 +46,12 @@ async fn main() -> eyre::Result<()> {
         let server_events_tx = server_events_tx.clone();
         let mcp_server = mcp_server.clone();
         async move {
-            let service = Service::new(routing::root(config.endpoint.clone(), mcp_server, server_events_tx.clone())).hoop(
+            let service = Service::new(routing::root(
+                config.endpoint.clone(),
+                mcp_server,
+                server_events_tx.clone(),
+            ))
+            .hoop(
                 Cors::new()
                     .allow_origin(AllowOrigin::any())
                     .allow_methods(AllowMethods::any())
@@ -71,7 +76,7 @@ async fn main() -> eyre::Result<()> {
                     break;
                 }
                 ServerEvent::CallNode {
-                    node_id,
+                    output,
                     data,
                     reply,
                 } => {
@@ -79,7 +84,7 @@ async fn main() -> eyre::Result<()> {
                     let call_id = gen_call_id();
                     metadata.insert("__dora_call_id".into(), Parameter::String(call_id.clone()));
                     node.send_output(
-                        DataId::from(node_id.clone()),
+                        DataId::from(output.clone()),
                         metadata,
                         StringArray::from(vec![data]),
                     )
@@ -163,7 +168,7 @@ async fn main() -> eyre::Result<()> {
 enum ServerEvent {
     Result(eyre::Result<()>),
     CallNode {
-        node_id: String,
+        output: String,
         data: String,
         reply: oneshot::Sender<String>,
     },
