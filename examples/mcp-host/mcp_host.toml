@@ -10,18 +10,18 @@ api_url = "https://api.moonshot.cn/v1"
 [[providers]]
 id = "gemini"
 kind ="gemini"
-# api_key = "AIzaSyC_kTTfK6C-737Xn10or9RdwkKCqAnioR8"
+# api_key = "env:GEMINI_API_KEY"
 api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 # [[providers]]
 # id = "deepseek"
 # kind ="deepseek"
-# # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+# # api_key = "env:DEEPSEEK_API_KEY"
 # api_url = "https://api.deepseek.com"
 
 # [[providers]]
 # id = "openai"
-# # api_key = "sk-afbe35f08fe24211a84c6cb9d0d39aba"
+# # api_key = "env:OPENAI_API_KEY"
 # api_url = "https://api.openai.com/v1"
 
 [[providers]]
