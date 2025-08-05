@@ -1,5 +1,5 @@
 """
-This is just a simple demonstration of an MCP server.
+This is just a simple demonstration of MCP server.
 
 This MCP server has the ability of telepathy and can know who the current 
 user's favorite star is and what their favorite movie is.

@@ -1,8 +1,8 @@
 """
-This is just a simple demonstration of an MCP server.
+This is just a simple demonstration of MCP server.
 
-The example returns some local information about the user's request, such as the tallest building, 
-the happiest kindergarten, the best restaurant, etc.
+The example returns some local information about the user's request, such as 
+the happiest kindergarten, each restaurant's signature dish, etc.
 """
 
 import pyarrow as pa
