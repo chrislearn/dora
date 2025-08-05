@@ -25,7 +25,6 @@ star_movie_pairs = [
     {"star": "Jennifer Lawrence", "movie": "The Hunger Games"},
     {"star": "Morgan Freeman", "movie": "The Shawshank Redemption"},
     {"star": "Denzel Washington", "movie": "Training Day"},
-    {"star": "Matt Damon", "movie": "The Martian"},
 ]
 
 node = Node()

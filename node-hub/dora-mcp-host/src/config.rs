@@ -34,7 +34,7 @@ pub fn init() {
         "json" => Figment::new().merge(Json::file(config_path)),
         "toml" => Figment::new().merge(Toml::file(config_path)),
         ext => {
-            eprintln!("unsupport config file format: {ext:?}");
+            eprintln!("unsupported config file format: {ext:?}");
             std::process::exit(1);
         }
     };

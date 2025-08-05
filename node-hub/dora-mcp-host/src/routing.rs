@@ -67,7 +67,7 @@ async fn chat_completions(
     tracing::info!("Prepare the chat completion request.");
 
     let mut chat_request = match req.parse_json::<CreateChatCompletionRequest>().await {
-        Ok(chat_requst) => chat_requst,
+        Ok(chat_request) => chat_request,
         Err(e) => {
             println!(
                 "parse request error: {e}, payload: {}",
